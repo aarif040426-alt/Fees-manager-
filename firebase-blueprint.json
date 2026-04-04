@@ -1,0 +1,62 @@
+{
+  "entities": {
+    "Teacher": {
+      "title": "Teacher",
+      "description": "A tutor using the system.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "mobile": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "teacher"] }
+      },
+      "required": ["uid", "email"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "A student managed by a teacher.",
+      "type": "object",
+      "properties": {
+        "teacherId": { "type": "string", "description": "UID of the teacher" },
+        "name": { "type": "string" },
+        "parentName": { "type": "string" },
+        "mobile": { "type": "string" },
+        "board": { "type": "string", "enum": ["SSC", "ICSE", "CBSE", "Other"] },
+        "standard": { "type": "string" },
+        "feeAmount": { "type": "number" },
+        "joiningDate": { "type": "string", "format": "date" }
+      },
+      "required": ["teacherId", "name", "feeAmount"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "A fee payment record for a student for a specific month.",
+      "type": "object",
+      "properties": {
+        "teacherId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "month": { "type": "string", "description": "YYYY-MM format" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["Paid", "Pending", "Partial"] },
+        "method": { "type": "string", "enum": ["Cash", "Online"] },
+        "paidAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["teacherId", "studentId", "month", "status"]
+    }
+  },
+  "firestore": {
+    "/teachers/{teacherId}": {
+      "schema": "Teacher",
+      "description": "Teacher profiles"
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Student records"
+    },
+    "/payments/{paymentId}": {
+      "schema": "Payment",
+      "description": "Payment history"
+    }
+  }
+}

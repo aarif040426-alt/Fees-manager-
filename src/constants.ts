@@ -1,0 +1,41 @@
+import { SubscriptionPlan } from './types';
+
+export interface PlanLimit {
+  maxStudents: number;
+  features: {
+    whatsappNotifications: boolean;
+    advancedReports: boolean;
+    prioritySupport: boolean;
+    exportData: boolean;
+  };
+}
+
+export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimit> = {
+  Free: {
+    maxStudents: 10,
+    features: {
+      whatsappNotifications: false,
+      advancedReports: false,
+      prioritySupport: false,
+      exportData: false,
+    },
+  },
+  Pro: {
+    maxStudents: 50,
+    features: {
+      whatsappNotifications: true,
+      advancedReports: true,
+      prioritySupport: false,
+      exportData: true,
+    },
+  },
+  Enterprise: {
+    maxStudents: Infinity,
+    features: {
+      whatsappNotifications: true,
+      advancedReports: true,
+      prioritySupport: true,
+      exportData: true,
+    },
+  },
+};

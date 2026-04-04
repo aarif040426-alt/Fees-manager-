@@ -1,0 +1,5 @@
+{
+  "name": "TutorFlow SaaS",
+  "description": "A tuition fee management system for private tutors to manage students, track payments, and send WhatsApp reminders. Includes admin panel, subscription management, and customizable themes.",
+  "requestFramePermissions": []
+}

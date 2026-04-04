@@ -1,0 +1,152 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: teachers
+    // Document ID: teacherId (auth.uid)
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - name: string (optional)
+    //   - email: string (required)
+    //   - mobile: string (optional)
+    //   - role: string (required, ['admin', 'teacher'])
+    //
+    // Collection: students
+    // Document ID: studentId (auto-generated)
+    // Fields:
+    //   - teacherId: string (required) - UID of the teacher
+    //   - name: string (required)
+    //   - parentName: string (optional)
+    //   - mobile: string (optional)
+    //   - board: string (required, ['SSC', 'ICSE', 'CBSE', 'Other'])
+    //   - standard: string (optional)
+    //   - feeAmount: number (required, positive)
+    //   - joiningDate: string (optional, ISO 8601)
+    //
+    // Collection: payments
+    // Document ID: paymentId (auto-generated)
+    // Fields:
+    //   - teacherId: string (required)
+    //   - studentId: string (required)
+    //   - month: string (required, YYYY-MM)
+    //   - amount: number (optional, positive)
+    //   - status: string (required, ['Paid', 'Pending', 'Partial'])
+    //   - method: string (optional, ['Cash', 'Online'])
+    //   - paidAt: string (optional, ISO 8601)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (request.auth.token.email.lower() == "mrhandsome81091@gmail.com" ||
+         (exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'admin'));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidTeacher(data) {
+      return hasRequiredFields(['uid', 'email', 'role']) &&
+             data.uid is string &&
+             isValidEmail(data.email) &&
+             data.role in ['admin', 'teacher'] &&
+             (data.get('name', null) == null || data.name is string) &&
+             (data.get('mobile', null) == null || data.mobile is string) &&
+             (data.get('plan', null) == null || data.plan in ['Free', 'Pro', 'Enterprise']) &&
+             (data.get('theme', null) == null || data.theme in ['light', 'dark', 'blue', 'purple']) &&
+             (data.get('planStartDate', null) == null || data.planStartDate is string) &&
+             (data.get('createdAt', null) == null || data.createdAt is string);
+    }
+
+    function isValidStudent(data) {
+      return hasRequiredFields(['teacherId', 'name', 'feeAmount', 'board']) &&
+             data.teacherId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.feeAmount is number && data.feeAmount >= 0 &&
+             data.board in ['SSC', 'ICSE', 'CBSE', 'Other'] &&
+             (data.get('parentName', null) == null || data.parentName is string) &&
+             (data.get('mobile', null) == null || data.mobile is string) &&
+             (data.get('standard', null) == null || data.standard is string) &&
+             (data.get('joiningDate', null) == null || data.joiningDate is string) &&
+             (data.get('createdAt', null) == null || data.createdAt is timestamp) &&
+             (data.get('updatedAt', null) == null || data.updatedAt is timestamp);
+    }
+
+    function isValidPayment(data) {
+      return hasRequiredFields(['teacherId', 'studentId', 'month', 'status']) &&
+             data.teacherId == request.auth.uid &&
+             data.studentId is string &&
+             data.month is string && data.month.matches("^\\d{4}-\\d{2}$") &&
+             data.status in ['Paid', 'Pending', 'Partial'] &&
+             (data.get('amount', null) == null || data.amount is number) &&
+             (data.get('method', null) == null || data.method in ['Cash', 'Online']) &&
+             (data.get('paidAt', null) == null || data.paidAt is string) &&
+             (data.get('createdAt', null) == null || data.createdAt is timestamp) &&
+             (data.get('updatedAt', null) == null || data.updatedAt is timestamp);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /teachers/{teacherId} {
+      allow read: if isOwner(teacherId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isAuthenticated() && isValidTeacher(request.resource.data) && (isOwner(teacherId) || isAdmin());
+      allow update: if isAuthenticated() && isValidTeacher(request.resource.data) && (isOwner(teacherId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /students/{studentId} {
+      allow read: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidStudent(request.resource.data);
+      allow update: if isAuthenticated() && isValidStudent(request.resource.data) && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+    }
+
+    match /payments/{paymentId} {
+      allow read: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidPayment(request.resource.data);
+      allow update: if isAuthenticated() && isValidPayment(request.resource.data) && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

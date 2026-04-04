@@ -1,0 +1,565 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, 
+  Search, 
+  Filter, 
+  CreditCard, 
+  Calendar, 
+  Shield, 
+  Lock, 
+  ChevronRight,
+  TrendingUp,
+  Mail,
+  Smartphone,
+  CheckCircle2,
+  AlertCircle,
+  ArrowRight,
+  RefreshCw,
+  ChevronLeft
+} from 'lucide-react';
+import { collection, query, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, loginWithGoogle } from '../lib/firebase';
+import { useAuth } from '../lib/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import { Teacher, SubscriptionPlan } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { format } from 'date-fns';
+
+export default function Admin() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    return sessionStorage.getItem('isAdminAuthenticated') === 'true';
+  });
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
+  const [firestoreError, setFirestoreError] = useState<string | null>(null);
+  const [debugInfo, setDebugInfo] = useState<string>('');
+
+  const { user, teacher, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (username === 'admin' && password === 'Admin@250522') {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('isAdminAuthenticated', 'true');
+      setError('');
+    } else {
+      setError('Invalid admin credentials');
+    }
+  };
+
+  const handleGoogleAdminLogin = async () => {
+    try {
+      const user = await loginWithGoogle();
+      if (user.email?.toLowerCase() === 'mrhandsome81091@gmail.com') {
+        setIsAuthenticated(true);
+        sessionStorage.setItem('isAdminAuthenticated', 'true');
+        setError('');
+      } else {
+        setError('Only mrhandsome81091@gmail.com is authorized for Google Admin access.');
+      }
+    } catch (err) {
+      setError('Failed to login with Google.');
+    }
+  };
+
+  const fetchTeachers = () => {
+    if (!user) {
+      setDebugInfo("Cannot fetch: No Google user session.");
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setFirestoreError(null);
+    setDebugInfo(`Initiating fetch at ${new Date().toLocaleTimeString()} for user: ${user.email}`);
+
+    const q = query(collection(db, 'teachers'));
+    
+    // Safety timeout
+    const timeoutId = setTimeout(() => {
+      setLoading(currentLoading => {
+        if (currentLoading) {
+          console.warn("Fetch timeout reached");
+          setFirestoreError("The connection is taking longer than expected. Please check your internet or ensure you are logged in with the correct admin account.");
+          setDebugInfo(prev => prev + "\n- Timeout reached after 15s");
+          return false;
+        }
+        return currentLoading;
+      });
+    }, 15000);
+
+    try {
+      // Fallback: Try a direct getDocs call first
+      getDocs(q).then(snapshot => {
+        if (loading) {
+          console.log("Fallback getDocs success, count:", snapshot.docs.length);
+          setTeachers(snapshot.docs.map(doc => ({ ...doc.data() } as Teacher)));
+          setLoading(false);
+          setDebugInfo(prev => prev + `\n- Fallback Success: Received ${snapshot.docs.length} records`);
+        }
+      }).catch(err => {
+        console.warn("Fallback getDocs failed:", err);
+      });
+
+      const unsubscribe = onSnapshot(q, (snapshot) => {
+        clearTimeout(timeoutId);
+        console.log("Teachers snapshot received, count:", snapshot.docs.length);
+        setTeachers(snapshot.docs.map(doc => ({ ...doc.data() } as Teacher)));
+        setLoading(false);
+        setFirestoreError(null);
+        setDebugInfo(prev => prev + `\n- Success: Received ${snapshot.docs.length} records at ${new Date().toLocaleTimeString()}`);
+      }, (err) => {
+        clearTimeout(timeoutId);
+        console.error("Firestore error in Admin panel:", err);
+        setFirestoreError(err.message || "Permission denied. You might not have admin rights.");
+        setLoading(false);
+        setDebugInfo(prev => prev + `\n- Error: ${err.code} - ${err.message}`);
+      });
+
+      return unsubscribe;
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      setFirestoreError(err.message);
+      setLoading(false);
+      setDebugInfo(prev => prev + `\n- Critical Error: ${err.message}`);
+    }
+  };
+
+  useEffect(() => {
+    if (user?.email?.toLowerCase() === 'mrhandsome81091@gmail.com' && !isAuthenticated) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('isAdminAuthenticated', 'true');
+    }
+  }, [user, isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated || authLoading) return;
+    
+    const unsubscribe = fetchTeachers();
+    return () => {
+      if (typeof unsubscribe === 'function') unsubscribe();
+    };
+  }, [isAuthenticated, user, authLoading]);
+
+  const handleUpdatePlan = async (teacherId: string, newPlan: SubscriptionPlan) => {
+    setUpdatingPlan(teacherId);
+    try {
+      await updateDoc(doc(db, 'teachers', teacherId), {
+        plan: newPlan,
+        planStartDate: new Date().toISOString()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, 'teachers');
+    } finally {
+      setUpdatingPlan(null);
+    }
+  };
+
+  const filteredTeachers = teachers.filter(t => 
+    t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    t.email?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (authLoading && isAuthenticated) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+          <p className="text-slate-500 font-medium">Verifying authentication...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-[80vh] flex items-center justify-center p-4">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="w-full max-w-md bg-white rounded-3xl border border-slate-200 shadow-2xl p-10"
+        >
+          <div className="flex flex-col items-center mb-8">
+            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-xl shadow-blue-100">
+              <Shield size={32} />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
+            <p className="text-slate-500 text-sm">Secure access for system administrators</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-6">
+            {user ? (
+              user.email?.toLowerCase() === 'mrhandsome81091@gmail.com' ? (
+                <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl flex flex-col items-center text-center gap-4">
+                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
+                    <Shield size={24} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-blue-900">Admin Account Detected</p>
+                    <p className="text-xs text-blue-700 mt-1">You are logged in as {user.email}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAuthenticated(true);
+                      sessionStorage.setItem('isAdminAuthenticated', 'true');
+                    }}
+                    className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
+                  >
+                    <ChevronRight size={18} />
+                    Continue to Dashboard
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl text-sm text-slate-600 mb-6">
+                    <p className="font-bold text-slate-800">Google Session Active</p>
+                    <p className="text-xs mt-1">You can now use admin credentials to access the portal.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700 ml-1">Username</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Users size={18} className="text-slate-400" />
+                      </div>
+                      <input
+                        type="text"
+                        required
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                        className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                        placeholder="Enter admin username"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                        <Lock size={18} className="text-slate-400" />
+                      </div>
+                      <input
+                        type="password"
+                        required
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                        placeholder="Enter admin password"
+                      />
+                    </div>
+                  </div>
+
+                  {error && (
+                    <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-xl text-sm font-medium">
+                      <AlertCircle size={16} />
+                      {error}
+                    </div>
+                  )}
+
+                  <button
+                    type="submit"
+                    className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-2"
+                  >
+                    <ChevronRight size={20} />
+                    Access Dashboard
+                  </button>
+                </>
+              )
+            ) : (
+              <div className="space-y-6">
+                <div className="bg-amber-50 border border-amber-100 text-amber-700 p-6 rounded-3xl flex flex-col items-center text-center gap-4">
+                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+                    <AlertCircle size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-amber-900">Google Login Required</h3>
+                    <p className="text-amber-700 text-xs mt-1 leading-relaxed">
+                      For security, you must sign in with your Google account first to establish a database connection.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleGoogleAdminLogin}
+                    className="w-full py-3.5 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2"
+                  >
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 brightness-0 invert" />
+                    Login with Google
+                  </button>
+                </div>
+                
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-slate-100"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs">
+                    <span className="px-4 bg-white text-slate-400 font-bold uppercase tracking-widest">Or Credentials</span>
+                  </div>
+                </div>
+
+                <div className="opacity-40 pointer-events-none grayscale">
+                  <div className="space-y-2 mb-4">
+                    <label className="text-sm font-bold text-slate-700 ml-1">Username</label>
+                    <input disabled className="block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl" placeholder="admin" />
+                  </div>
+                  <div className="space-y-2 mb-6">
+                    <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
+                    <input disabled className="block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl" placeholder="••••••••" />
+                  </div>
+                  <button disabled className="w-full py-4 bg-slate-300 text-white font-bold rounded-2xl">Access Dashboard</button>
+                </div>
+              </div>
+            )}
+          </form>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 p-6 md:p-10">
+      <div className="max-w-7xl mx-auto space-y-10">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Admin Dashboard</h1>
+            <p className="text-slate-500 mt-1">Manage all registered teachers and their subscriptions.</p>
+            {user && (
+              <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-400">
+                <Shield size={12} />
+                <span>Logged in as: <span className="text-slate-600">{user.email}</span></span>
+                <span className={`px-1.5 py-0.5 rounded-md ${teacher?.role === 'admin' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>
+                  {teacher?.role || 'Checking role...'}
+                </span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/')}
+              className="p-3 text-blue-600 bg-blue-50 border border-blue-100 rounded-2xl hover:bg-blue-100 transition-colors shadow-sm flex items-center gap-2 font-bold"
+              title="Back to Dashboard"
+            >
+              <ChevronLeft size={20} />
+              <span>Back to Dashboard</span>
+            </button>
+            <button
+              onClick={() => {
+                setDebugInfo(prev => prev + "\n- Manual refresh triggered");
+                fetchTeachers();
+              }}
+              disabled={loading}
+              className="p-3 text-slate-600 bg-white border border-slate-200 rounded-2xl hover:bg-slate-50 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+              title="Refresh Data"
+            >
+              <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+              <span className="text-sm font-bold hidden md:inline">Refresh</span>
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem('isAdminAuthenticated');
+                window.location.href = '/login';
+              }}
+              className="px-5 py-3 text-red-600 bg-red-50 border border-red-100 rounded-2xl hover:bg-red-100 transition-colors font-bold flex items-center gap-2"
+            >
+              <Lock size={18} />
+              Logout Admin
+            </button>
+            <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-3">
+              <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
+                <Users size={20} />
+              </div>
+              <div>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Total Teachers</p>
+                <p className="text-xl font-bold text-slate-900">{teachers.length}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {debugInfo && (loading || firestoreError) && (
+          <div className="bg-slate-900/5 border border-slate-200 p-4 rounded-2xl font-mono text-[10px] text-slate-500 overflow-auto max-h-32">
+            <p className="font-bold mb-1 uppercase tracking-widest text-[9px]">Diagnostic Log:</p>
+            <pre className="whitespace-pre-wrap">{debugInfo}</pre>
+          </div>
+        )}
+
+        {firestoreError && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-red-50 border border-red-100 p-6 rounded-3xl flex flex-col items-center text-center gap-4"
+          >
+            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center">
+              <AlertCircle size={24} />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-red-900">Permission Denied</h3>
+              <p className="text-red-600/80 text-sm max-w-md mt-1">
+                {firestoreError}
+                <br />
+                <span className="mt-2 block font-medium">Make sure you are logged in with the admin email: <span className="underline">mrhandsome81091@gmail.com</span></span>
+              </p>
+            </div>
+            <button 
+              onClick={() => window.location.reload()}
+              className="px-6 py-2 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 transition-colors shadow-lg shadow-red-100"
+            >
+              Retry Connection
+            </button>
+          </motion.div>
+        )}
+
+        {!user && (
+          <motion.div 
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-amber-50 border border-amber-100 p-8 rounded-3xl flex flex-col items-center text-center gap-6"
+          >
+            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
+              <AlertCircle size={32} />
+            </div>
+            <div className="max-w-md">
+              <h3 className="text-xl font-bold text-amber-900">Google Login Required</h3>
+              <p className="text-amber-700 mt-2">
+                For security, you must sign in with your Google account first to establish a database connection.
+              </p>
+            </div>
+            <button 
+              onClick={() => navigate('/login')}
+              className="px-8 py-3 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-100 flex items-center gap-2"
+            >
+              Go to Login Page
+              <ArrowRight size={18} />
+            </button>
+          </motion.div>
+        )}
+
+        {loading && !firestoreError && user && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+            <p className="text-slate-500 font-medium">Fetching teacher records...</p>
+          </div>
+        )}
+
+        {!loading && !firestoreError && teachers.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-20 gap-4">
+            <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-3xl flex items-center justify-center">
+              <Users size={32} />
+            </div>
+            <div className="text-center">
+              <h3 className="text-lg font-bold text-slate-900">No Teachers Found</h3>
+              <p className="text-slate-500 text-sm">There are currently no registered teachers in the system.</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && !firestoreError && teachers.length > 0 && (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+              <input
+                type="text"
+                placeholder="Search teachers by name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all duration-200"
+              />
+            </div>
+            <button className="flex items-center gap-2 px-5 py-3 text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-colors font-bold">
+              <Filter size={18} />
+              Filter
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/50">
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Teacher</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Joined Date</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Plan</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Plan Start</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <AnimatePresence mode="popLayout">
+                  {filteredTeachers.map((teacher) => (
+                    <motion.tr
+                      layout
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      key={teacher.uid}
+                      className="hover:bg-slate-50/50 transition-colors group"
+                    >
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
+                            {teacher.name?.[0] || 'T'}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800">{teacher.name || 'N/A'}</p>
+                            <p className="text-xs text-slate-500">{teacher.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Calendar size={14} />
+                          <span className="text-sm">{teacher.createdAt ? format(new Date(teacher.createdAt), 'dd MMM yyyy') : 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase tracking-wider border ${
+                          teacher.plan === 'Enterprise' 
+                            ? "bg-purple-100 text-purple-700 border-purple-200" 
+                            : teacher.plan === 'Pro'
+                            ? "bg-blue-100 text-blue-700 border-blue-200"
+                            : "bg-slate-100 text-slate-700 border-slate-200"
+                        }`}>
+                          {teacher.plan || 'Free'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="text-sm text-slate-500">
+                          {teacher.planStartDate ? format(new Date(teacher.planStartDate), 'dd MMM yyyy') : 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <select
+                            value={teacher.plan || 'Free'}
+                            disabled={updatingPlan === teacher.uid}
+                            onChange={(e) => handleUpdatePlan(teacher.uid, e.target.value as SubscriptionPlan)}
+                            className="text-xs font-bold bg-slate-50 border border-slate-200 rounded-lg px-2 py-1.5 text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+                          >
+                            <option value="Free">Free</option>
+                            <option value="Pro">Pro</option>
+                            <option value="Enterprise">Enterprise</option>
+                          </select>
+                          {updatingPlan === teacher.uid && (
+                            <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
+                          )}
+                        </div>
+                      </td>
+                    </motion.tr>
+                  ))}
+                </AnimatePresence>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        )}
+      </div>
+    </div>
+  );
+}
