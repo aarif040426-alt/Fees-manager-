@@ -15,10 +15,12 @@ import {
   AlertCircle,
   ArrowRight,
   RefreshCw,
-  ChevronLeft
+  ChevronLeft,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { collection, query, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, loginWithGoogle } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { Teacher, SubscriptionPlan } from '../types';
@@ -31,6 +33,7 @@ export default function Admin() {
   });
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   
   const [teachers, setTeachers] = useState<Teacher[]>([]);
@@ -45,7 +48,7 @@ export default function Admin() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (username === 'admin' && password === 'Admin@250522') {
+    if (username === 'Admin' && password === 'Aayat@250522') {
       setIsAuthenticated(true);
       sessionStorage.setItem('isAdminAuthenticated', 'true');
       setError('');
@@ -54,31 +57,11 @@ export default function Admin() {
     }
   };
 
-  const handleGoogleAdminLogin = async () => {
-    try {
-      const user = await loginWithGoogle();
-      if (user.email?.toLowerCase() === 'mrhandsome81091@gmail.com') {
-        setIsAuthenticated(true);
-        sessionStorage.setItem('isAdminAuthenticated', 'true');
-        setError('');
-      } else {
-        setError('Only mrhandsome81091@gmail.com is authorized for Google Admin access.');
-      }
-    } catch (err) {
-      setError('Failed to login with Google.');
-    }
-  };
-
   const fetchTeachers = () => {
-    if (!user) {
-      setDebugInfo("Cannot fetch: No Google user session.");
-      setLoading(false);
-      return;
-    }
-
+    if (loading && teachers.length > 0) return; // Already loading
     setLoading(true);
     setFirestoreError(null);
-    setDebugInfo(`Initiating fetch at ${new Date().toLocaleTimeString()} for user: ${user.email}`);
+    setDebugInfo(prev => prev + `\n- Initiating fetch at ${new Date().toLocaleTimeString()}`);
 
     const q = query(collection(db, 'teachers'));
     
@@ -86,8 +69,8 @@ export default function Admin() {
     const timeoutId = setTimeout(() => {
       setLoading(currentLoading => {
         if (currentLoading) {
-          console.warn("Fetch timeout reached");
-          setFirestoreError("The connection is taking longer than expected. Please check your internet or ensure you are logged in with the correct admin account.");
+          console.warn("Admin fetch timeout reached");
+          setFirestoreError("The connection is taking longer than expected. Please check your internet connection.");
           setDebugInfo(prev => prev + "\n- Timeout reached after 15s");
           return false;
         }
@@ -98,12 +81,10 @@ export default function Admin() {
     try {
       // Fallback: Try a direct getDocs call first
       getDocs(q).then(snapshot => {
-        if (loading) {
-          console.log("Fallback getDocs success, count:", snapshot.docs.length);
-          setTeachers(snapshot.docs.map(doc => ({ ...doc.data() } as Teacher)));
-          setLoading(false);
-          setDebugInfo(prev => prev + `\n- Fallback Success: Received ${snapshot.docs.length} records`);
-        }
+        console.log("Fallback getDocs success, count:", snapshot.docs.length);
+        setTeachers(snapshot.docs.map(doc => ({ ...doc.data() } as Teacher)));
+        setLoading(false);
+        setDebugInfo(prev => prev + `\n- Fallback Success: Received ${snapshot.docs.length} records`);
       }).catch(err => {
         console.warn("Fallback getDocs failed:", err);
       });
@@ -133,11 +114,12 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    if (user?.email?.toLowerCase() === 'mrhandsome81091@gmail.com' && !isAuthenticated) {
+    setDebugInfo(prev => prev + `\n- Auth State: user=${!!user}, teacher=${!!teacher}, role=${teacher?.role}, authLoading=${authLoading}`);
+    if (teacher?.role === 'admin' && !isAuthenticated) {
       setIsAuthenticated(true);
       sessionStorage.setItem('isAdminAuthenticated', 'true');
     }
-  }, [user, isAuthenticated]);
+  }, [teacher, isAuthenticated, user, authLoading]);
 
   useEffect(() => {
     if (!isAuthenticated || authLoading) return;
@@ -146,7 +128,7 @@ export default function Admin() {
     return () => {
       if (typeof unsubscribe === 'function') unsubscribe();
     };
-  }, [isAuthenticated, user, authLoading]);
+  }, [isAuthenticated, authLoading]);
 
   const handleUpdatePlan = async (teacherId: string, newPlan: SubscriptionPlan) => {
     setUpdatingPlan(teacherId);
@@ -195,128 +177,61 @@ export default function Admin() {
           </div>
 
           <form onSubmit={handleLogin} className="space-y-6">
-            {user ? (
-              user.email?.toLowerCase() === 'mrhandsome81091@gmail.com' ? (
-                <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl flex flex-col items-center text-center gap-4">
-                  <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">
-                    <Shield size={24} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-blue-900">Admin Account Detected</p>
-                    <p className="text-xs text-blue-700 mt-1">You are logged in as {user.email}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAuthenticated(true);
-                      sessionStorage.setItem('isAdminAuthenticated', 'true');
-                    }}
-                    className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-100 flex items-center justify-center gap-2"
-                  >
-                    <ChevronRight size={18} />
-                    Continue to Dashboard
-                  </button>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700 ml-1">Username</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Users size={18} className="text-slate-400" />
                 </div>
-              ) : (
-                <>
-                  <div className="bg-slate-50 border border-slate-200 p-4 rounded-2xl text-sm text-slate-600 mb-6">
-                    <p className="font-bold text-slate-800">Google Session Active</p>
-                    <p className="text-xs mt-1">You can now use admin credentials to access the portal.</p>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Username</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Users size={18} className="text-slate-400" />
-                      </div>
-                      <input
-                        type="text"
-                        required
-                        value={username}
-                        onChange={(e) => setUsername(e.target.value)}
-                        className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                        placeholder="Enter admin username"
-                      />
-                    </div>
-                  </div>
+                <input
+                  type="text"
+                  required
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                  placeholder="Enter admin username"
+                />
+              </div>
+            </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
-                    <div className="relative">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <Lock size={18} className="text-slate-400" />
-                      </div>
-                      <input
-                        type="password"
-                        required
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                        placeholder="Enter admin password"
-                      />
-                    </div>
-                  </div>
-
-                  {error && (
-                    <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-xl text-sm font-medium">
-                      <AlertCircle size={16} />
-                      {error}
-                    </div>
-                  )}
-
-                  <button
-                    type="submit"
-                    className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-2"
-                  >
-                    <ChevronRight size={20} />
-                    Access Dashboard
-                  </button>
-                </>
-              )
-            ) : (
-              <div className="space-y-6">
-                <div className="bg-amber-50 border border-amber-100 text-amber-700 p-6 rounded-3xl flex flex-col items-center text-center gap-4">
-                  <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
-                    <AlertCircle size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-bold text-amber-900">Google Login Required</h3>
-                    <p className="text-amber-700 text-xs mt-1 leading-relaxed">
-                      For security, you must sign in with your Google account first to establish a database connection.
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleGoogleAdminLogin}
-                    className="w-full py-3.5 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-100 flex items-center justify-center gap-2"
-                  >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 brightness-0 invert" />
-                    Login with Google
-                  </button>
+            <div className="space-y-2">
+              <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Lock size={18} className="text-slate-400" />
                 </div>
-                
-                <div className="relative my-6">
-                  <div className="absolute inset-0 flex items-center">
-                    <div className="w-full border-t border-slate-100"></div>
-                  </div>
-                  <div className="relative flex justify-center text-xs">
-                    <span className="px-4 bg-white text-slate-400 font-bold uppercase tracking-widest">Or Credentials</span>
-                  </div>
-                </div>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                  placeholder="Enter admin password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
 
-                <div className="opacity-40 pointer-events-none grayscale">
-                  <div className="space-y-2 mb-4">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Username</label>
-                    <input disabled className="block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl" placeholder="admin" />
-                  </div>
-                  <div className="space-y-2 mb-6">
-                    <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
-                    <input disabled className="block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl" placeholder="••••••••" />
-                  </div>
-                  <button disabled className="w-full py-4 bg-slate-300 text-white font-bold rounded-2xl">Access Dashboard</button>
-                </div>
+            {error && (
+              <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-xl text-sm font-medium">
+                <AlertCircle size={16} />
+                {error}
               </div>
             )}
+
+            <button
+              type="submit"
+              className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-2"
+            >
+              <ChevronRight size={20} />
+              Access Dashboard
+            </button>
           </form>
         </motion.div>
       </div>
@@ -330,15 +245,13 @@ export default function Admin() {
           <div>
             <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Admin Dashboard</h1>
             <p className="text-slate-500 mt-1">Manage all registered teachers and their subscriptions.</p>
-            {user && (
-              <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-400">
-                <Shield size={12} />
-                <span>Logged in as: <span className="text-slate-600">{user.email}</span></span>
-                <span className={`px-1.5 py-0.5 rounded-md ${teacher?.role === 'admin' ? 'bg-green-50 text-green-600' : 'bg-amber-50 text-amber-600'}`}>
-                  {teacher?.role || 'Checking role...'}
-                </span>
-              </div>
-            )}
+            <div className="mt-2 flex items-center gap-2 text-xs font-medium text-slate-400">
+              <Shield size={12} />
+              <span>Logged in as: <span className="text-slate-600">Admin</span></span>
+              <span className="px-1.5 py-0.5 rounded-md bg-green-50 text-green-600">
+                Administrator
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <button
@@ -416,32 +329,7 @@ export default function Admin() {
           </motion.div>
         )}
 
-        {!user && (
-          <motion.div 
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-amber-50 border border-amber-100 p-8 rounded-3xl flex flex-col items-center text-center gap-6"
-          >
-            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center">
-              <AlertCircle size={32} />
-            </div>
-            <div className="max-w-md">
-              <h3 className="text-xl font-bold text-amber-900">Google Login Required</h3>
-              <p className="text-amber-700 mt-2">
-                For security, you must sign in with your Google account first to establish a database connection.
-              </p>
-            </div>
-            <button 
-              onClick={() => navigate('/login')}
-              className="px-8 py-3 bg-amber-600 text-white rounded-2xl font-bold hover:bg-amber-700 transition-all shadow-lg shadow-amber-100 flex items-center gap-2"
-            >
-              Go to Login Page
-              <ArrowRight size={18} />
-            </button>
-          </motion.div>
-        )}
-
-        {loading && !firestoreError && user && (
+        {loading && !firestoreError && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
             <p className="text-slate-500 font-medium">Fetching teacher records...</p>

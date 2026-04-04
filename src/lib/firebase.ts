@@ -1,13 +1,12 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, query, where, onSnapshot, getDocFromServer, FirestoreError } from 'firebase/firestore';
+import { getAuth } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Initialize Firebase SDK
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
-export const googleProvider = new GoogleAuthProvider();
 
 // Operation types for error handling
 export enum OperationType {
@@ -25,34 +24,15 @@ interface FirestoreErrorInfo {
   path: string | null;
   authInfo: {
     userId: string | undefined;
-    email: string | null | undefined;
-    emailVerified: boolean | undefined;
-    isAnonymous: boolean | undefined;
-    tenantId: string | null | undefined;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
   }
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const userId = localStorage.getItem('teacherUid') || undefined;
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map(provider => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL
-      })) || []
+      userId
     },
     operationType,
     path
@@ -74,14 +54,7 @@ async function testConnection() {
 testConnection();
 
 // Auth helpers
-export const loginWithGoogle = async () => {
-  try {
-    const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error) {
-    console.error("Login failed:", error);
-    throw error;
-  }
+export const logout = () => {
+  localStorage.removeItem('teacherUid');
+  window.location.href = '/login';
 };
-
-export const logout = () => signOut(auth);

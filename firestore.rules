@@ -48,14 +48,17 @@ service cloud.firestore {
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isAuthenticated() && 
+        (request.auth.uid == userId || 
+         request.auth.token.email.lower() == (userId.lower() + "@tutorflow.com"));
     }
 
     function isAdmin() {
       return isAuthenticated() &&
         (request.auth.token.email.lower() == "mrhandsome81091@gmail.com" ||
-         (exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'admin'));
+         request.auth.token.email.lower() == "admin@tutorflow.com" ||
+         (exists(/databases/$(database)/documents/teachers/$(request.auth.token.email.lower().split('@')[0])) && 
+          get(/databases/$(database)/documents/teachers/$(request.auth.token.email.lower().split('@')[0])).data.role == 'admin'));
     }
 
     function hasRequiredFields(fields) {
@@ -93,7 +96,7 @@ service cloud.firestore {
 
     function isValidStudent(data) {
       return hasRequiredFields(['teacherId', 'name', 'feeAmount', 'board']) &&
-             data.teacherId == request.auth.uid &&
+             isOwner(data.teacherId) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              data.feeAmount is number && data.feeAmount >= 0 &&
              data.board in ['SSC', 'ICSE', 'CBSE', 'Other'] &&
@@ -107,7 +110,7 @@ service cloud.firestore {
 
     function isValidPayment(data) {
       return hasRequiredFields(['teacherId', 'studentId', 'month', 'status']) &&
-             data.teacherId == request.auth.uid &&
+             isOwner(data.teacherId) &&
              data.studentId is string &&
              data.month is string && data.month.matches("^\\d{4}-\\d{2}$") &&
              data.status in ['Paid', 'Pending', 'Partial'] &&
@@ -131,17 +134,17 @@ service cloud.firestore {
     }
 
     match /students/{studentId} {
-      allow read: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated() && (isOwner(resource.data.teacherId) || isAdmin());
       allow create: if isAuthenticated() && isValidStudent(request.resource.data);
-      allow update: if isAuthenticated() && isValidStudent(request.resource.data) && (resource.data.teacherId == request.auth.uid || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidStudent(request.resource.data) && (isOwner(resource.data.teacherId) || isAdmin());
+      allow delete: if isAuthenticated() && (isOwner(resource.data.teacherId) || isAdmin());
     }
 
     match /payments/{paymentId} {
-      allow read: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow read: if isAuthenticated() && (isOwner(resource.data.teacherId) || isAdmin());
       allow create: if isAuthenticated() && isValidPayment(request.resource.data);
-      allow update: if isAuthenticated() && isValidPayment(request.resource.data) && (resource.data.teacherId == request.auth.uid || isAdmin());
-      allow delete: if isAuthenticated() && (resource.data.teacherId == request.auth.uid || isAdmin());
+      allow update: if isAuthenticated() && isValidPayment(request.resource.data) && (isOwner(resource.data.teacherId) || isAdmin());
+      allow delete: if isAuthenticated() && (isOwner(resource.data.teacherId) || isAdmin());
     }
 
     // Default deny

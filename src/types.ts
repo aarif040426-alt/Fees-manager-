@@ -8,6 +8,7 @@ export interface Teacher {
   uid: string;
   name: string | null;
   email: string | null;
+  password?: string;
   mobile?: string;
   role: 'admin' | 'teacher';
   plan: SubscriptionPlan;

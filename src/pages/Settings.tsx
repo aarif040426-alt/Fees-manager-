@@ -19,10 +19,14 @@ import {
   Zap,
   Crown,
   Star,
-  Calendar
+  Calendar,
+  AlertCircle,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, logout } from '../lib/firebase';
+import { updatePassword } from 'firebase/auth';
+import { db, handleFirestoreError, OperationType, logout, auth } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -112,6 +116,64 @@ export default function Settings() {
         [key]: !prev.notifications[key]
       }
     }));
+  };
+
+  const [securityData, setSecurityData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [securityLoading, setSecurityLoading] = useState(false);
+  const [securityMessage, setSecurityMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  const handlePasswordUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teacher) return;
+    
+    if (securityData.newPassword !== securityData.confirmPassword) {
+      setSecurityMessage({ type: 'error', text: 'New passwords do not match.' });
+      return;
+    }
+
+    if (securityData.newPassword.length < 6) {
+      setSecurityMessage({ type: 'error', text: 'Password must be at least 6 characters.' });
+      return;
+    }
+
+    if (teacher.password && securityData.currentPassword !== teacher.password) {
+      setSecurityMessage({ type: 'error', text: 'Incorrect current password.' });
+      return;
+    }
+
+    setSecurityLoading(true);
+    setSecurityMessage(null);
+
+    try {
+      // 1. Update Firebase Auth password
+      if (auth.currentUser) {
+        await updatePassword(auth.currentUser, securityData.newPassword);
+      }
+
+      // 2. Update Firestore document
+      await updateDoc(doc(db, 'teachers', teacher.uid), {
+        password: securityData.newPassword
+      });
+      
+      setSecurityMessage({ type: 'success', text: 'Password updated successfully!' });
+      setSecurityData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      console.error("Error updating password:", err);
+      if (err.code === 'auth/requires-recent-login') {
+        setSecurityMessage({ type: 'error', text: 'Please log out and log back in to change your password for security reasons.' });
+      } else {
+        setSecurityMessage({ type: 'error', text: err.message || 'Failed to update password.' });
+      }
+    } finally {
+      setSecurityLoading(false);
+    }
   };
 
   return (
@@ -466,7 +528,17 @@ export default function Settings() {
                     <p className="text-slate-500 mt-1">Manage your password and account security.</p>
                   </div>
 
-                  <div className="space-y-6">
+                  {securityMessage && (
+                    <div className={cn(
+                      "p-4 rounded-2xl text-sm font-medium flex items-center gap-2",
+                      securityMessage.type === 'success' ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-red-50 text-red-700 border border-red-100"
+                    )}>
+                      <AlertCircle size={18} />
+                      {securityMessage.text}
+                    </div>
+                  )}
+
+                  <form onSubmit={handlePasswordUpdate} className="space-y-6">
                     <div className="space-y-2">
                       <label className="text-sm font-bold text-slate-700 ml-1">Current Password</label>
                       <div className="relative">
@@ -474,37 +546,76 @@ export default function Settings() {
                           <Lock size={18} className="text-slate-400" />
                         </div>
                         <input
-                          type="password"
+                          type={showCurrentPassword ? "text" : "password"}
+                          required
+                          value={securityData.currentPassword}
+                          onChange={(e) => setSecurityData({ ...securityData, currentPassword: e.target.value })}
                           placeholder="••••••••"
-                          className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                          className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                        >
+                          {showCurrentPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                        </button>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="space-y-2">
                         <label className="text-sm font-bold text-slate-700 ml-1">New Password</label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          className="block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showNewPassword ? "text" : "password"}
+                            required
+                            value={securityData.newPassword}
+                            onChange={(e) => setSecurityData({ ...securityData, newPassword: e.target.value })}
+                            placeholder="••••••••"
+                            className="block w-full px-4 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowNewPassword(!showNewPassword)}
+                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                          </button>
+                        </div>
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-bold text-slate-700 ml-1">Confirm New Password</label>
-                        <input
-                          type="password"
-                          placeholder="••••••••"
-                          className="block w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                        />
+                        <div className="relative">
+                          <input
+                            type={showConfirmPassword ? "text" : "password"}
+                            required
+                            value={securityData.confirmPassword}
+                            onChange={(e) => setSecurityData({ ...securityData, confirmPassword: e.target.value })}
+                            placeholder="••••••••"
+                            className="block w-full px-4 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
+                          >
+                            {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                          </button>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="pt-6 border-t border-slate-100 flex justify-end">
-                    <button className="px-8 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 shadow-lg shadow-slate-200 transition-all">
-                      Update Password
-                    </button>
-                  </div>
+                    <div className="pt-6 border-t border-slate-100 flex justify-end">
+                      <button
+                        type="submit"
+                        disabled={securityLoading}
+                        className="px-8 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 shadow-lg shadow-slate-200 transition-all flex items-center gap-2"
+                      >
+                        {securityLoading && <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+                        Update Password
+                      </button>
+                    </div>
+                  </form>
                 </div>
 
                 <div className="bg-white rounded-3xl border border-slate-200 shadow-sm p-8 space-y-6">

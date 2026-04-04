@@ -10,8 +10,8 @@ import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ children, adminOnly }) => {
+  const { user, teacher, loading } = useAuth();
 
   if (loading) {
     return (
@@ -25,6 +25,10 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     return <Navigate to="/login" />;
   }
 
+  if (adminOnly && teacher?.role !== 'admin') {
+    return <Navigate to="/" />;
+  }
+
   return <>{children}</>;
 };
 
@@ -34,7 +38,14 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
-          <Route path="/admin" element={<Admin />} />
+          <Route
+            path="/admin"
+            element={
+              <ProtectedRoute adminOnly>
+                <Admin />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="/"
             element={
