@@ -62,6 +62,13 @@ export default function Layout() {
     navigate('/login');
   };
 
+  const handleStopImpersonation = () => {
+    sessionStorage.removeItem('impersonatedTeacherUid');
+    window.location.reload();
+  };
+
+  const isImpersonating = !!sessionStorage.getItem('impersonatedTeacherUid');
+
   const navItems = [
     { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/students', icon: Users, label: 'Students' },
@@ -73,6 +80,22 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-[#f8fafc] flex">
+      {/* Impersonation Banner */}
+      {isImpersonating && (
+        <div className="fixed top-0 left-0 right-0 h-12 bg-[#2563eb] text-[#ffffff] flex items-center justify-between px-6 z-[60] shadow-lg">
+          <div className="flex items-center gap-2 text-sm font-bold">
+            <Shield size={18} />
+            <span>Viewing as: {teacher?.name} ({teacher?.email})</span>
+          </div>
+          <button 
+            onClick={handleStopImpersonation}
+            className="bg-[#ffffff] text-[#2563eb] px-3 py-1 rounded-lg text-xs font-bold hover:bg-[#eff6ff] transition-colors"
+          >
+            Stop Viewing
+          </button>
+        </div>
+      )}
+
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -114,12 +137,8 @@ export default function Layout() {
 
           <div className="mt-auto pt-6 border-t border-[#f1f5f9]">
             <div className="flex items-center gap-3 px-2 mb-6">
-              <div className="w-10 h-10 rounded-full bg-[#dbeafe] flex items-center justify-center text-[#2563eb] font-bold overflow-hidden border border-[#e2e8f0]">
-                {teacher?.photoUrl ? (
-                  <img src={teacher.photoUrl} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                ) : (
-                  teacher?.name?.[0] || 'T'
-                )}
+              <div className="w-10 h-10 rounded-full bg-[#dbeafe] flex items-center justify-center text-[#2563eb] font-bold">
+                {teacher?.name?.[0] || 'T'}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-[#1e293b] truncate">{teacher?.name || 'Teacher'}</p>
@@ -138,7 +157,10 @@ export default function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main className={cn(
+        "flex-1 flex flex-col min-w-0 overflow-hidden",
+        isImpersonating && "pt-12"
+      )}>
         {/* Header */}
         <header className="h-16 bg-[#ffffff] border-b border-[#e2e8f0] flex items-center justify-between px-6 sticky top-0 z-30">
           <button

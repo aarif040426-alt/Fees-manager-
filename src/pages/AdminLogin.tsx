@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Shield, Lock, Users, Eye, EyeOff, AlertCircle, ChevronRight } from 'lucide-react';
+import { Shield, Lock, Users, Eye, EyeOff, AlertCircle, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useAuth } from '../lib/AuthContext';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Teacher } from '../types';
@@ -15,7 +15,9 @@ export default function AdminLogin() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   if (loading) {
     return (
@@ -29,10 +31,45 @@ export default function AdminLogin() {
     return <Navigate to="/admin" />;
   }
 
+  const handleForgotPassword = async () => {
+    if (!username) {
+      setError('Please enter your admin username or email first.');
+      return;
+    }
+
+    setIsResetting(true);
+    setError('');
+    setSuccess('');
+
+    let email = username;
+    if (!username.includes('@')) {
+      if (username === 'Admin') {
+        email = 'admin@tutorflow.com';
+      } else if (username === 'mrhandsome81091') {
+        email = 'mrhandsome81091@gmail.com';
+      } else {
+        setError('Please enter your admin username or email first.');
+        setIsResetting(false);
+        return;
+      }
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccess('Admin password reset email sent!');
+    } catch (err: any) {
+      console.error("Admin reset error:", err);
+      setError(err.message || 'Failed to send reset email.');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
     setError('');
+    setSuccess('');
 
     try {
       let email = '';
@@ -43,18 +80,27 @@ export default function AdminLogin() {
         isHardcodedAdmin = true;
       } else if (username.includes('@')) {
         email = username;
+      } else if (username === 'mrhandsome81091') {
+        email = 'mrhandsome81091@gmail.com';
       } else {
-        // Try to treat username as email if it's the admin email
-        if (username === 'mrhandsome81091') {
-          email = 'mrhandsome81091@gmail.com';
-        } else {
-          throw new Error('Invalid admin credentials');
-        }
+        throw new Error('Invalid admin credentials');
       }
 
       // 1. Sign in with Firebase Auth
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      const firebaseUser = userCredential.user;
+      let firebaseUser;
+      try {
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        firebaseUser = userCredential.user;
+      } catch (err: any) {
+        // If user not found and it's an allowed admin email, try to create it
+        const isAdminEmail = email === 'admin@tutorflow.com' || email === 'mrhandsome81091@gmail.com';
+        if ((err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') && isAdminEmail) {
+          const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          firebaseUser = userCredential.user;
+        } else {
+          throw err;
+        }
+      }
 
       // 2. Check if this user is allowed to be an admin
       const isAdminEmail = firebaseUser.email === 'admin@tutorflow.com' || firebaseUser.email === 'mrhandsome81091@gmail.com';
@@ -99,7 +145,11 @@ export default function AdminLogin() {
       navigate('/admin');
     } catch (err: any) {
       console.error("Admin login error:", err);
-      setError(err.message || 'An error occurred during admin login.');
+      if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+        setError('Invalid admin credentials. Please check your password.');
+      } else {
+        setError(err.message || 'An error occurred during admin login.');
+      }
     } finally {
       setIsLoggingIn(false);
     }
@@ -140,7 +190,17 @@ export default function AdminLogin() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-sm font-bold text-slate-700">Password</label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isResetting}
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  {isResetting ? 'Sending...' : 'Forgot Password?'}
+                </button>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock size={18} className="text-slate-400" />
@@ -167,6 +227,13 @@ export default function AdminLogin() {
               <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-xl text-sm font-medium">
                 <AlertCircle size={16} />
                 {error}
+              </div>
+            )}
+
+            {success && (
+              <div className="flex items-center gap-2 text-green-600 bg-green-50 p-3 rounded-xl text-sm font-medium">
+                <CheckCircle2 size={16} />
+                {success}
               </div>
             )}
 

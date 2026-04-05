@@ -264,7 +264,7 @@ export default function Dashboard() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value as any)}
-              className="px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all duration-200 appearance-none cursor-pointer min-w-[120px]"
+              className="w-full md:w-auto px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-slate-600 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all duration-200 appearance-none cursor-pointer min-w-[120px]"
             >
               <option value="All">All Status</option>
               <option value="Paid">Paid</option>
@@ -273,7 +273,8 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50">
@@ -386,24 +387,113 @@ export default function Dashboard() {
                   );
                 })}
               </AnimatePresence>
-              {filteredStudents.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="bg-slate-100 p-4 rounded-full text-slate-400">
-                        <Users size={40} />
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold text-slate-800">No students found</p>
-                        <p className="text-slate-500">Try adjusting your search or add a new student.</p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden divide-y divide-slate-100">
+          <AnimatePresence mode="popLayout">
+            {filteredStudents.map((student) => {
+              const payment = payments.find(p => p.studentId === student.id);
+              const status = payment?.status || 'Pending';
+
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  key={student.id}
+                  className="p-4 space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center text-blue-600 font-bold shadow-sm">
+                        {student.photoUrl ? (
+                          <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          student.name[0]
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{student.name}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          {student.standard} • ₹{student.feeAmount}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge status={status} />
+                  </div>
+
+                  <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <Clock size={14} className="text-slate-400" />
+                      <span className="text-xs font-medium text-slate-600">
+                        Due: {format(getNextDueDate(student), 'MMM yyyy')}
+                      </span>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      {status === 'Pending' ? (
+                        <>
+                          <button
+                            onClick={() => setPaymentModal({ student, isOpen: true })}
+                            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-bold shadow-sm shadow-emerald-200"
+                          >
+                            <CheckCircle2 size={14} />
+                            Pay
+                          </button>
+                          <button
+                            onClick={() => handleSendReminder(student)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                          >
+                            <MessageCircle size={18} />
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setReceiptModal({ payment: payment!, student, isOpen: true })}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                          >
+                            <Receipt size={18} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteModal({ student, isOpen: true })}
+                            className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => setReportModal({ student, isOpen: true })}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                      >
+                        <FileText size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+
+        {filteredStudents.length === 0 && !loading && (
+          <div className="px-6 py-20 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="bg-slate-100 p-4 rounded-full text-slate-400">
+                <Users size={40} />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-slate-800">No students found</p>
+                <p className="text-slate-500">Try adjusting your search or add a new student.</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <AnimatePresence>
         {paymentModal.isOpen && (

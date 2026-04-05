@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
-import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
-import { GraduationCap, User, Lock, ArrowRight, Shield, AlertCircle, ChevronRight, Eye, EyeOff } from 'lucide-react';
+import { GraduationCap, User, Lock, ArrowRight, Shield, AlertCircle, ChevronRight, Eye, EyeOff, Mail, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Teacher } from '../types';
 
@@ -12,10 +12,12 @@ export default function Login() {
   const { user, loading, login } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   if (loading) {
     return (
@@ -29,16 +31,63 @@ export default function Login() {
     return <Navigate to="/" />;
   }
 
+  const handleForgotPassword = async () => {
+    if (!username) {
+      setError('Please enter your email or username first.');
+      return;
+    }
+
+    setIsResetting(true);
+    setError(null);
+    setSuccess(null);
+
+    let email = username;
+    if (!username.includes('@')) {
+      if (username === 'Admin') {
+        email = 'admin@tutorflow.com';
+      } else if (username.toLowerCase() === 'mrhandsome81091') {
+        email = 'mrhandsome81091@gmail.com';
+      } else {
+        email = `${username.toLowerCase().replace(/\s+/g, '_')}@tutorflow.com`;
+      }
+    }
+
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setSuccess('Password reset email sent! Please check your inbox.');
+    } catch (err: any) {
+      console.error("Reset error:", err);
+      if (err.code === 'auth/user-not-found') {
+        setError('No account found with this email.');
+      } else {
+        setError(err.message || 'Failed to send reset email.');
+      }
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
     setError(null);
+    setSuccess(null);
 
     let email = username;
     let teacherUid = username.toLowerCase().replace(/\s+/g, '_');
+    let isHardcodedAdmin = false;
 
     if (!username.includes('@')) {
-      email = `${username.toLowerCase().replace(/\s+/g, '_')}@tutorflow.com`;
+      if (username === 'Admin' && password === 'Aayat@250522') {
+        email = 'admin@tutorflow.com';
+        teacherUid = 'admin';
+        isHardcodedAdmin = true;
+      } else if (username.toLowerCase() === 'mrhandsome81091') {
+        email = 'mrhandsome81091@gmail.com';
+        teacherUid = 'mrhandsome81091';
+      } else {
+        email = `${username.toLowerCase().replace(/\s+/g, '_')}@tutorflow.com`;
+      }
     } else {
       teacherUid = username.split('@')[0];
     }
@@ -57,7 +106,16 @@ export default function Login() {
 
         if (teacherSnap.exists()) {
           const data = teacherSnap.data() as Teacher;
-          login(teacherUid, data);
+          
+          // Ensure admin role is set for admin emails
+          if (isAdminEmail && data.role !== 'admin') {
+            const updatedData = { ...data, role: 'admin' as const };
+            await setDoc(teacherRef, updatedData, { merge: true });
+            login(teacherUid, updatedData);
+          } else {
+            login(teacherUid, data);
+          }
+
           if (data.role === 'admin' || isAdminEmail) {
             sessionStorage.setItem('isAdminAuthenticated', 'true');
             navigate('/admin');
@@ -90,17 +148,15 @@ export default function Login() {
         }
       } catch (err: any) {
         if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-          // 2. Create new Teacher account if not found (only for non-admin emails)
-          if (email === 'admin@tutorflow.com' || email === 'mrhandsome81091@gmail.com') {
-            setError('Invalid admin credentials.');
-            return;
-          }
+          // 2. Create new Teacher account if not found
+          // For admin emails, we allow creation if it's the first time
+          const isAdminEmail = email === 'admin@tutorflow.com' || email === 'mrhandsome81091@gmail.com';
 
           try {
             await createUserWithEmailAndPassword(auth, email, password);
           } catch (createErr: any) {
             if (createErr.code === 'auth/email-already-in-use') {
-              setError('Invalid password for this teacher account.');
+              setError('Invalid password for this account.');
               return;
             }
             throw createErr;
@@ -111,10 +167,10 @@ export default function Login() {
             uid: teacherUid,
             name: username,
             email: email,
-            role: 'teacher',
-            plan: 'Free',
+            role: isAdminEmail ? 'admin' : 'teacher',
+            plan: isAdminEmail ? 'Enterprise' : 'Free',
             planStartDate: new Date().toISOString(),
-            theme: 'light',
+            theme: isAdminEmail ? 'dark' : 'light',
             notifications: {
               email: true,
               whatsapp: true,
@@ -125,9 +181,15 @@ export default function Login() {
           const teacherRef = doc(db, 'teachers', teacherUid);
           await setDoc(teacherRef, newTeacher);
           login(teacherUid, newTeacher);
-          navigate('/');
+          
+          if (isAdminEmail) {
+            sessionStorage.setItem('isAdminAuthenticated', 'true');
+            navigate('/admin');
+          } else {
+            navigate('/');
+          }
         } else if (err.code === 'auth/wrong-password') {
-          setError('Invalid password for this teacher account.');
+          setError('Invalid password for this account.');
         } else {
           throw err;
         }
@@ -169,9 +231,16 @@ export default function Login() {
             </div>
           )}
 
+          {success && (
+            <div className="bg-green-50 border border-green-100 text-green-600 px-4 py-3 rounded-xl mb-6 text-sm font-medium flex items-center gap-2">
+              <CheckCircle2 size={18} />
+              {success}
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Username / ID</label>
+              <label className="text-sm font-bold text-slate-700 ml-1">Username / Email</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <User size={18} className="text-slate-400" />
@@ -182,13 +251,23 @@ export default function Login() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="block w-full pl-11 pr-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all duration-200"
-                  placeholder="Enter your username"
+                  placeholder="Enter your username or email"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
+              <div className="flex items-center justify-between ml-1">
+                <label className="text-sm font-bold text-slate-700">Password</label>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={isResetting}
+                  className="text-xs font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  {isResetting ? 'Sending...' : 'Forgot Password?'}
+                </button>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                   <Lock size={18} className="text-slate-400" />
@@ -229,7 +308,7 @@ export default function Login() {
 
           <div className="mt-10 pt-6 border-t border-slate-100 text-center">
             <p className="text-slate-400 text-xs">
-              Secure access for teachers.
+              Secure access for teachers. New users will be automatically registered.
             </p>
           </div>
         </motion.div>

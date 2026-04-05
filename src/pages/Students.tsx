@@ -366,8 +366,8 @@ export default function Students() {
     <div className="space-y-8">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Students</h1>
-          <p className="text-slate-500 mt-1">Manage your student directory and their details.</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">Students</h1>
+          <p className="text-sm md:text-base text-slate-500 mt-1">Manage your student directory and their details.</p>
         </div>
 
         <button
@@ -385,7 +385,7 @@ export default function Students() {
             setIsModalOpen(true);
           }}
           className={cn(
-            "flex items-center justify-center gap-2 text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all group self-start",
+            "w-full md:w-auto flex items-center justify-center gap-2 text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all group",
             isLimitReached ? "bg-slate-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700 shadow-blue-200"
           )}
         >
@@ -405,8 +405,8 @@ export default function Students() {
       )}
 
       <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-6 border-b border-slate-100">
-          <div className="relative max-w-md">
+        <div className="p-4 md:p-6 border-b border-slate-100">
+          <div className="relative w-full max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
             <input
               type="text"
@@ -418,7 +418,7 @@ export default function Students() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 p-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 p-4 md:p-6">
           <AnimatePresence mode="popLayout">
             {filteredStudents.map((student) => (
               <motion.div

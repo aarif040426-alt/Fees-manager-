@@ -58,12 +58,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // We use the email prefix as the teacherUid to maintain consistency with previous logic
-          const teacherUid = firebaseUser.email?.split('@')[0] || firebaseUser.uid;
+          // Check for impersonation (only allowed for admins)
+          const impersonatedUid = sessionStorage.getItem('impersonatedTeacherUid');
+          const realTeacherUid = firebaseUser.email?.split('@')[0] || firebaseUser.uid;
           
           // Special case for hardcoded Admin and User Email
           const isAdminEmail = firebaseUser.email === 'admin@tutorflow.com' || firebaseUser.email === 'mrhandsome81091@gmail.com';
-          if (isAdminEmail) {
+          
+          const teacherUid = (isAdminEmail && impersonatedUid) ? impersonatedUid : realTeacherUid;
+
+          if (isAdminEmail && !impersonatedUid) {
             const adminData: Teacher = {
               uid: teacherUid,
               name: firebaseUser.displayName || (firebaseUser.email === 'admin@tutorflow.com' ? 'Administrator' : 'Admin User'),
@@ -89,12 +93,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           if (teacherSnap.exists()) {
             const data = teacherSnap.data() as Teacher;
+            // If impersonating, we keep the admin role for the current session's logic if needed, 
+            // but the data will be the teacher's data.
+            // Actually, we should probably merge them or just use the teacher data.
             setTeacher(data);
             setUser({ uid: teacherUid, email: data.email || '', displayName: data.name || '' });
             if (data.theme) applyTheme(data.theme);
-          } else {
-            // If user exists in Auth but not in Firestore, don't sign out immediately
-            // as it might be a new user being created in Login.tsx
+          } else if (!isAdminEmail) {
             console.log("Teacher profile not found in Firestore for:", teacherUid);
             setUser({ uid: teacherUid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
           }

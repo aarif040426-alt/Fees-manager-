@@ -30,7 +30,7 @@ interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const userId = localStorage.getItem('teacherUid') || undefined;
+  const userId = auth.currentUser?.uid || undefined;
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {

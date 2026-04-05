@@ -115,7 +115,7 @@ export default function Reports() {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {[
           { label: 'Total Revenue', value: `₹${stats.totalRevenue}`, icon: IndianRupee, color: 'emerald' },
           { label: 'Active Students', value: stats.totalStudents, icon: Users, color: 'blue' },
@@ -126,36 +126,36 @@ export default function Reports() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
-            className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm"
+            className="bg-white p-4 md:p-6 rounded-3xl border border-slate-200 shadow-sm"
           >
             <div className="flex items-center gap-4">
-              <div className={`p-4 rounded-2xl bg-${stat.color}-50 text-${stat.color}-600`}>
+              <div className={`p-3 md:p-4 rounded-2xl bg-${stat.color}-50 text-${stat.color}-600`}>
                 <stat.icon size={24} />
               </div>
               <div>
-                <p className="text-sm font-medium text-slate-500">{stat.label}</p>
-                <h3 className="text-2xl font-bold text-slate-900">{stat.value}</h3>
+                <p className="text-xs md:text-sm font-medium text-slate-500">{stat.label}</p>
+                <h3 className="text-xl md:text-2xl font-bold text-slate-900">{stat.value}</h3>
               </div>
             </div>
           </motion.div>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
         {/* Revenue Chart */}
         <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm"
+          className="bg-white p-4 md:p-8 rounded-3xl border border-slate-200 shadow-sm"
         >
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <div className="flex items-center justify-between mb-6 md:mb-8">
+            <h3 className="text-lg md:text-xl font-bold text-slate-900 flex items-center gap-2">
               <BarChart3 className="text-blue-600" size={20} />
               Revenue Growth
             </h3>
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Last 6 Months</span>
+            <span className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">Last 6 Months</span>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[250px] md:h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={revenueData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
@@ -163,20 +163,20 @@ export default function Reports() {
                   dataKey="label" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }} 
+                  tick={{ fill: '#64748b', fontSize: 10, fontWeight: 500 }} 
                   dy={10}
                 />
                 <YAxis 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 500 }}
+                  tick={{ fill: '#64748b', fontSize: 10, fontWeight: 500 }}
                   dx={-10}
                 />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="amount" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={40} />
+                <Bar dataKey="amount" fill="#3b82f6" radius={[6, 6, 0, 0]} barSize={30} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -187,23 +187,23 @@ export default function Reports() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm"
+          className="bg-white p-4 md:p-8 rounded-3xl border border-slate-200 shadow-sm"
         >
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <div className="flex items-center justify-between mb-6 md:mb-8">
+            <h3 className="text-lg md:text-xl font-bold text-slate-900 flex items-center gap-2">
               <PieChartIcon className="text-blue-600" size={20} />
               Board Distribution
             </h3>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[250px] md:h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
                   data={boardData}
                   cx="50%"
                   cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
+                  innerRadius={50}
+                  outerRadius={80}
                   paddingAngle={5}
                   dataKey="value"
                 >
@@ -214,7 +214,7 @@ export default function Reports() {
                 <Tooltip 
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Legend verticalAlign="bottom" height={36} iconType="circle" />
+                <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: '10px' }} />
               </PieChart>
             </ResponsiveContainer>
           </div>
@@ -225,15 +225,15 @@ export default function Reports() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.3 }}
-          className="bg-white p-8 rounded-3xl border border-slate-200 shadow-sm lg:col-span-2"
+          className="bg-white p-4 md:p-8 rounded-3xl border border-slate-200 shadow-sm lg:col-span-2"
         >
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
+          <div className="flex items-center justify-between mb-6 md:mb-8">
+            <h3 className="text-lg md:text-xl font-bold text-slate-900 flex items-center gap-2">
               <Calendar className="text-blue-600" size={20} />
               Top Standards
             </h3>
           </div>
-          <div className="h-[300px] w-full">
+          <div className="h-[250px] md:h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={standardData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
@@ -243,14 +243,14 @@ export default function Reports() {
                   type="category" 
                   axisLine={false} 
                   tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 12, fontWeight: 600 }}
-                  width={100}
+                  tick={{ fill: '#64748b', fontSize: 10, fontWeight: 600 }}
+                  width={80}
                 />
                 <Tooltip 
                   cursor={{ fill: '#f8fafc' }}
                   contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
                 />
-                <Bar dataKey="value" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={30} />
+                <Bar dataKey="value" fill="#6366f1" radius={[0, 6, 6, 0]} barSize={20} />
               </BarChart>
             </ResponsiveContainer>
           </div>

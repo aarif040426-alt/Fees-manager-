@@ -17,9 +17,12 @@ import {
   RefreshCw,
   ChevronLeft,
   Eye,
-  EyeOff
+  EyeOff,
+  Trash2,
+  Download,
+  Key
 } from 'lucide-react';
-import { collection, query, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate, Navigate } from 'react-router-dom';
@@ -41,6 +44,7 @@ export default function Admin() {
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (teacher?.role === 'admin' && !isAuthenticated) {
@@ -136,6 +140,56 @@ export default function Admin() {
     }
   };
 
+  const handleDeleteTeacher = async (teacherId: string, teacherName: string) => {
+    if (!window.confirm(`Are you sure you want to delete teacher "${teacherName}"? This will NOT delete their Firebase Auth account, only their Firestore profile and data access.`)) {
+      return;
+    }
+
+    try {
+      await deleteDoc(doc(db, 'teachers', teacherId));
+      setTeachers(prev => prev.filter(t => t.uid !== teacherId));
+    } catch (err) {
+      handleFirestoreError(err, OperationType.DELETE, 'teachers');
+    }
+  };
+
+  const handleImpersonate = (teacherUid: string) => {
+    sessionStorage.setItem('impersonatedTeacherUid', teacherUid);
+    navigate('/');
+    window.location.reload(); // Force reload to pick up new UID
+  };
+
+  const handleExportData = () => {
+    setIsExporting(true);
+    try {
+      const headers = ['Name', 'Email', 'Plan', 'Joined Date', 'Plan Start Date'];
+      const csvContent = [
+        headers.join(','),
+        ...teachers.map(t => [
+          `"${t.name || ''}"`,
+          `"${t.email || ''}"`,
+          `"${t.plan || 'Free'}"`,
+          `"${t.createdAt ? format(new Date(t.createdAt), 'yyyy-MM-dd') : ''}"`,
+          `"${t.planStartDate ? format(new Date(t.planStartDate), 'yyyy-MM-dd') : ''}"`
+        ].join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `teachers_export_${format(new Date(), 'yyyy-MM-dd')}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error("Export error:", err);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const filteredTeachers = teachers.filter(t => 
     t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     t.email?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -179,6 +233,15 @@ export default function Admin() {
             >
               <ChevronLeft size={20} />
               <span>Back to Dashboard</span>
+            </button>
+            <button
+              onClick={handleExportData}
+              disabled={isExporting || teachers.length === 0}
+              className="p-3 text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-2xl hover:bg-emerald-100 transition-colors shadow-sm disabled:opacity-50 flex items-center gap-2"
+              title="Export Teachers Data"
+            >
+              <Download size={20} className={isExporting ? "animate-bounce" : ""} />
+              <span className="text-sm font-bold hidden md:inline">Export CSV</span>
             </button>
             <button
               onClick={() => {
@@ -343,6 +406,13 @@ export default function Admin() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleImpersonate(teacher.uid)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View as Teacher"
+                          >
+                            <Eye size={18} />
+                          </button>
                           <select
                             value={teacher.plan || 'Free'}
                             disabled={updatingPlan === teacher.uid}
@@ -356,6 +426,13 @@ export default function Admin() {
                           {updatingPlan === teacher.uid && (
                             <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
                           )}
+                          <button
+                            onClick={() => handleDeleteTeacher(teacher.uid, teacher.name || 'N/A')}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete Teacher"
+                          >
+                            <Trash2 size={18} />
+                          </button>
                         </div>
                       </td>
                     </motion.tr>

@@ -227,14 +227,15 @@ export default function Payments() {
           <button 
             onClick={handleExportCSV}
             disabled={filteredPayments.length === 0}
-            className="flex items-center gap-2 px-6 py-3 text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full md:w-auto flex items-center justify-center gap-2 px-6 py-3 text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Download size={18} />
             <span>Export CSV</span>
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50/50">
@@ -328,24 +329,95 @@ export default function Payments() {
                   );
                 })}
               </AnimatePresence>
-              {filteredPayments.length === 0 && !loading && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-20 text-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="bg-slate-100 p-4 rounded-full text-slate-400">
-                        <CreditCard size={40} />
-                      </div>
-                      <div>
-                        <p className="text-lg font-bold text-slate-800">No payment records found</p>
-                        <p className="text-slate-500">Payments will appear here once students are marked as paid.</p>
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden divide-y divide-slate-100">
+          <AnimatePresence mode="popLayout">
+            {filteredPayments.map((payment) => {
+              const student = students.find(s => s.id === payment.studentId);
+              return (
+                <motion.div
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  key={payment.id}
+                  className="p-4 space-y-4"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
+                        {student?.name[0] || 'S'}
+                      </div>
+                      <div>
+                        <p className="font-bold text-slate-800">{student?.name || 'Unknown Student'}</p>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          {payment.method || 'Cash'} • ₹{payment.amount}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge status={payment.status} />
+                  </div>
+
+                  <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl">
+                    <div className="text-[10px] font-medium text-slate-500">
+                      Paid on: {payment.paidAt ? format(new Date(payment.paidAt), 'dd MMM, yyyy') : 'N/A'}
+                    </div>
+                    
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => handleQuickWhatsAppShare(payment, student!)}
+                        className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors"
+                      >
+                        <MessageCircle size={18} />
+                      </button>
+                      <button
+                        onClick={() => setReceiptModal({ payment, student: student!, isOpen: true })}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-colors"
+                      >
+                        <Receipt size={18} />
+                      </button>
+                      <button
+                        onClick={() => setReportModal({ student: student!, isOpen: true })}
+                        className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors"
+                      >
+                        <FileText size={18} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteModal({ 
+                          paymentId: payment.id, 
+                          studentName: student?.name || 'Unknown', 
+                          month: payment.month, 
+                          isOpen: true 
+                        })}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+        </div>
+
+        {filteredPayments.length === 0 && !loading && (
+          <div className="px-6 py-20 text-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="bg-slate-100 p-4 rounded-full text-slate-400">
+                <CreditCard size={40} />
+              </div>
+              <div>
+                <p className="text-lg font-bold text-slate-800">No payment records found</p>
+                <p className="text-slate-500">Payments will appear here once students are marked as paid.</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
       <AnimatePresence>
         {receiptModal.isOpen && (

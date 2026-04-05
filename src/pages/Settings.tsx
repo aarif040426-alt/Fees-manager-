@@ -259,7 +259,7 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
         {/* Navigation Sidebar */}
-        <div className="space-y-2">
+        <div className="flex lg:flex-col overflow-x-auto lg:overflow-x-visible pb-4 lg:pb-0 gap-2 -mx-4 px-4 lg:mx-0 lg:px-0 scrollbar-hide">
           {[
             { label: 'Profile', icon: User, tab: 'Profile' as SettingsTab },
             { label: 'Notifications', icon: Bell, tab: 'Notifications' as SettingsTab },
@@ -269,10 +269,10 @@ export default function Settings() {
             <button
               key={item.label}
               onClick={() => setActiveTab(item.tab)}
-              className={`w-full flex items-center gap-3 px-5 py-4 rounded-2xl font-bold transition-all ${
+              className={`flex-shrink-0 lg:w-full flex items-center gap-3 px-5 py-3 lg:py-4 rounded-2xl font-bold transition-all whitespace-nowrap ${
                 activeTab === item.tab 
                   ? "bg-blue-600 text-white shadow-xl shadow-blue-100" 
-                  : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200"
+                  : "text-slate-500 hover:bg-white hover:text-slate-900 border border-transparent hover:border-slate-200 bg-white lg:bg-transparent"
               }`}
             >
               <item.icon size={20} />
