@@ -256,7 +256,7 @@ export default function AdminLogin() {
         
         <div className="mt-8 text-center">
           <button 
-            onClick={() => navigate('/login')}
+            onClick={() => navigate('/')}
             className="text-slate-400 hover:text-white transition-colors text-sm font-medium"
           >
             ← Back to Teacher Login

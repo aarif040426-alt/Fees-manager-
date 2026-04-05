@@ -59,7 +59,7 @@ export default function Layout() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/login');
+    navigate('/');
   };
 
   const handleStopImpersonation = () => {
@@ -70,11 +70,11 @@ export default function Layout() {
   const isImpersonating = !!sessionStorage.getItem('impersonatedTeacherUid');
 
   const navItems = [
-    { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { to: '/students', icon: Users, label: 'Students' },
-    { to: '/payments', icon: CreditCard, label: 'Payments' },
-    { to: '/reports', icon: BarChart3, label: 'Reports' },
-    { to: '/settings', icon: Settings, label: 'Settings' },
+    { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { to: '/dashboard/students', icon: Users, label: 'Students' },
+    { to: '/dashboard/payments', icon: CreditCard, label: 'Payments' },
+    { to: '/dashboard/reports', icon: BarChart3, label: 'Reports' },
+    { to: '/dashboard/settings', icon: Settings, label: 'Settings' },
     ...(teacher?.role === 'admin' ? [{ to: '/admin', icon: Shield, label: 'Admin Panel' }] : []),
   ];
 

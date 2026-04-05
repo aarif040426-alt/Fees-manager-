@@ -58,5 +58,5 @@ testConnection();
 // Auth helpers
 export const logout = () => {
   localStorage.removeItem('teacherUid');
-  window.location.href = '/login';
+  window.location.href = '/';
 };

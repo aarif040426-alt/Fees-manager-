@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Teacher } from '../types';
 
 export default function Login() {
-  const { user, loading, login } = useAuth();
+  const { user, teacher, loading, login } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -28,7 +28,10 @@ export default function Login() {
   }
 
   if (user) {
-    return <Navigate to="/" />;
+    if (teacher?.role === 'admin') {
+      return <Navigate to="/admin" />;
+    }
+    return <Navigate to="/dashboard" />;
   }
 
   const handleForgotPassword = async () => {
@@ -186,7 +189,7 @@ export default function Login() {
             sessionStorage.setItem('isAdminAuthenticated', 'true');
             navigate('/admin');
           } else {
-            navigate('/');
+            navigate('/dashboard');
           }
         } else if (err.code === 'auth/wrong-password') {
           setError('Invalid password for this account.');

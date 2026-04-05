@@ -23,7 +23,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean 
   }
 
   if (!user) {
-    return <Navigate to={adminOnly ? "/admin/login" : "/login"} />;
+    return <Navigate to={adminOnly ? "/admin/login" : "/"} />;
   }
 
   if (adminOnly && teacher?.role !== 'admin') {
@@ -38,7 +38,7 @@ export default function App() {
     <AuthProvider>
       <Router>
         <Routes>
-          <Route path="/login" element={<Login />} />
+          <Route path="/" element={<Login />} />
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route
             path="/admin"
@@ -49,7 +49,7 @@ export default function App() {
             }
           />
           <Route
-            path="/"
+            path="/dashboard"
             element={
               <ProtectedRoute>
                 <Layout />
@@ -62,6 +62,8 @@ export default function App() {
             <Route path="reports" element={<Reports />} />
             <Route path="settings" element={<Settings />} />
           </Route>
+          {/* Fallback for old links */}
+          <Route path="/login" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>
     </AuthProvider>

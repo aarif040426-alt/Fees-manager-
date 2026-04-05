@@ -155,7 +155,7 @@ export default function Admin() {
 
   const handleImpersonate = (teacherUid: string) => {
     sessionStorage.setItem('impersonatedTeacherUid', teacherUid);
-    navigate('/');
+    navigate('/dashboard');
     window.location.reload(); // Force reload to pick up new UID
   };
 
@@ -227,7 +227,7 @@ export default function Admin() {
           </div>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/dashboard')}
               className="p-3 text-blue-600 bg-blue-50 border border-blue-100 rounded-2xl hover:bg-blue-100 transition-colors shadow-sm flex items-center gap-2 font-bold"
               title="Back to Dashboard"
             >
@@ -259,7 +259,7 @@ export default function Admin() {
               onClick={async () => {
                 sessionStorage.removeItem('isAdminAuthenticated');
                 await logout();
-                navigate('/login');
+                navigate('/');
               }}
               className="px-5 py-3 text-red-600 bg-red-50 border border-red-100 rounded-2xl hover:bg-red-100 transition-colors font-bold flex items-center gap-2"
             >
