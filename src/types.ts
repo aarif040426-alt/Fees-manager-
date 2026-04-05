@@ -14,6 +14,7 @@ export interface Teacher {
   plan: SubscriptionPlan;
   planStartDate: string;
   theme: Theme;
+  photoUrl?: string;
   notifications: {
     email: boolean;
     whatsapp: boolean;
@@ -32,6 +33,7 @@ export interface Student {
   standard?: string;
   feeAmount: number;
   joiningDate?: string;
+  photoUrl?: string;
 }
 
 export interface Payment {

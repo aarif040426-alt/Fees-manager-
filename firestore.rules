@@ -50,7 +50,7 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && 
         (request.auth.uid == userId || 
-         request.auth.token.email.lower() == (userId.lower() + "@tutorflow.com"));
+         request.auth.token.email.lower().split('@')[0] == userId.lower());
     }
 
     function isAdmin() {
@@ -90,6 +90,7 @@ service cloud.firestore {
              (data.get('mobile', null) == null || data.mobile is string) &&
              (data.get('plan', null) == null || data.plan in ['Free', 'Pro', 'Enterprise']) &&
              (data.get('theme', null) == null || data.theme in ['light', 'dark', 'blue', 'purple']) &&
+             (data.get('photoUrl', null) == null || data.photoUrl is string) &&
              (data.get('planStartDate', null) == null || data.planStartDate is string) &&
              (data.get('createdAt', null) == null || data.createdAt is string);
     }
@@ -103,6 +104,7 @@ service cloud.firestore {
              (data.get('parentName', null) == null || data.parentName is string) &&
              (data.get('mobile', null) == null || data.mobile is string) &&
              (data.get('standard', null) == null || data.standard is string) &&
+             (data.get('photoUrl', null) == null || data.photoUrl is string) &&
              (data.get('joiningDate', null) == null || data.joiningDate is string) &&
              (data.get('createdAt', null) == null || data.createdAt is timestamp) &&
              (data.get('updatedAt', null) == null || data.updatedAt is timestamp);

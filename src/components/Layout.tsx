@@ -55,7 +55,7 @@ export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { teacher } = useAuth();
+  const { teacher, logout } = useAuth();
 
   const handleLogout = async () => {
     await logout();
@@ -114,8 +114,12 @@ export default function Layout() {
 
           <div className="mt-auto pt-6 border-t border-[#f1f5f9]">
             <div className="flex items-center gap-3 px-2 mb-6">
-              <div className="w-10 h-10 rounded-full bg-[#dbeafe] flex items-center justify-center text-[#2563eb] font-bold">
-                {teacher?.name?.[0] || 'T'}
+              <div className="w-10 h-10 rounded-full bg-[#dbeafe] flex items-center justify-center text-[#2563eb] font-bold overflow-hidden border border-[#e2e8f0]">
+                {teacher?.photoUrl ? (
+                  <img src={teacher.photoUrl} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  teacher?.name?.[0] || 'T'
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-[#1e293b] truncate">{teacher?.name || 'Teacher'}</p>

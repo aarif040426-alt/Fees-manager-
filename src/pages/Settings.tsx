@@ -26,7 +26,8 @@ import {
 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { updatePassword } from 'firebase/auth';
-import { db, handleFirestoreError, OperationType, logout, auth } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, handleFirestoreError, OperationType, logout, auth, storage } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
@@ -34,6 +35,8 @@ import { Theme, SubscriptionPlan } from '../types';
 import { PLAN_LIMITS } from '../constants';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+import { AlertModal } from '../components/UIModals';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -54,10 +57,20 @@ export default function Settings() {
       email: true,
       whatsapp: true,
       paymentReminders: true,
-    }
+    },
+    photoUrl: ''
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [upgradeLoading, setUpgradeLoading] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [alertData, setAlertData] = useState<{ isOpen: boolean; title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
 
   useEffect(() => {
     if (teacher) {
@@ -70,17 +83,43 @@ export default function Settings() {
           email: true,
           whatsapp: true,
           paymentReminders: true,
-        }
+        },
+        photoUrl: teacher.photoUrl || ''
       });
+      setPhotoPreview(teacher.photoUrl || null);
     }
   }, [teacher]);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadPhoto = async (file: File, teacherUid: string): Promise<string> => {
+    const storageRef = ref(storage, `teachers/${teacherUid}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!teacher) return;
     setLoading(true);
     try {
-      await updateDoc(doc(db, 'teachers', teacher.uid), formData);
+      let currentPhotoUrl = formData.photoUrl;
+      if (photoFile) {
+        currentPhotoUrl = await uploadPhoto(photoFile, teacher.uid);
+      }
+      
+      const updateData = { ...formData, photoUrl: currentPhotoUrl };
+      await updateDoc(doc(db, 'teachers', teacher.uid), updateData);
       setTheme(formData.theme);
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -88,6 +127,27 @@ export default function Settings() {
       handleFirestoreError(err, OperationType.UPDATE, 'teachers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleUpgradePlan = async (planId: SubscriptionPlan) => {
+    if (!teacher) return;
+    setUpgradeLoading(planId);
+    try {
+      await updateDoc(doc(db, 'teachers', teacher.uid), {
+        plan: planId,
+        planStartDate: new Date().toISOString()
+      });
+      setAlertData({
+        isOpen: true,
+        title: 'Plan Upgraded!',
+        message: `Congratulations! You have successfully upgraded to the ${planId} plan.`,
+        type: 'success'
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, 'teachers');
+    } finally {
+      setUpgradeLoading(null);
     }
   };
 
@@ -105,7 +165,12 @@ export default function Settings() {
     const planLimit = teacher ? PLAN_LIMITS[teacher.plan] : PLAN_LIMITS.Free;
     
     if (key === 'whatsapp' && !planLimit.features.whatsappNotifications) {
-      alert(`WhatsApp notifications are only available in Pro and Enterprise plans. Please upgrade to enable this feature.`);
+      setAlertData({
+        isOpen: true,
+        title: 'Pro Feature',
+        message: 'WhatsApp notifications are only available in Pro and Enterprise plans. Please upgrade to enable this feature.',
+        type: 'warning'
+      });
       return;
     }
 
@@ -232,15 +297,21 @@ export default function Settings() {
                     <div className="flex flex-col sm:flex-row items-center gap-6">
                       <div className="relative group">
                         <div className="w-24 h-24 rounded-3xl bg-blue-600 flex items-center justify-center text-white text-3xl font-bold shadow-xl shadow-blue-100 overflow-hidden">
-                          {user?.photoURL ? (
-                            <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                          {photoPreview ? (
+                            <img src={photoPreview} alt="Profile" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                           ) : (
                             teacher?.name?.[0] || 'T'
                           )}
                         </div>
-                        <button className="absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-lg border border-slate-100 text-slate-600 hover:text-blue-600 transition-colors">
+                        <label className="absolute -bottom-2 -right-2 p-2 bg-white rounded-xl shadow-lg border border-slate-100 text-slate-600 hover:text-blue-600 transition-colors cursor-pointer">
                           <Camera size={16} />
-                        </button>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handlePhotoChange}
+                            className="hidden"
+                          />
+                        </label>
                       </div>
                       <div className="text-center sm:text-left">
                         <h3 className="text-xl font-bold text-slate-900">{teacher?.name || 'Teacher'}</h3>
@@ -480,14 +551,27 @@ export default function Settings() {
                           ))}
                         </ul>
                         <button
-                          disabled={teacher?.plan === plan.id}
-                          className={`w-full py-3 rounded-xl font-bold transition-all ${
+                          disabled={teacher?.plan === plan.id || upgradeLoading !== null}
+                          onClick={() => handleUpgradePlan(plan.id as SubscriptionPlan)}
+                          className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
                             teacher?.plan === plan.id
                               ? "bg-emerald-100 text-emerald-700 cursor-default"
                               : "bg-slate-900 text-white hover:bg-slate-800"
                           }`}
                         >
-                          {teacher?.plan === plan.id ? 'Current Plan' : 'Upgrade'}
+                          {upgradeLoading === plan.id ? (
+                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          ) : teacher?.plan === plan.id ? (
+                            <>
+                              <Check size={18} />
+                              Current Plan
+                            </>
+                          ) : (
+                            <>
+                              <Zap size={18} />
+                              Upgrade to {plan.label}
+                            </>
+                          )}
                         </button>
                       </div>
                     ))}
@@ -640,6 +724,14 @@ export default function Settings() {
           </AnimatePresence>
         </div>
       </div>
+
+      <AlertModal
+        isOpen={alertData.isOpen}
+        onClose={() => setAlertData({ ...alertData, isOpen: false })}
+        title={alertData.title}
+        message={alertData.message}
+        type={alertData.type}
+      />
     </div>
   );
 }

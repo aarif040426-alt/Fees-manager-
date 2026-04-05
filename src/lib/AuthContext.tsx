@@ -61,12 +61,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           // We use the email prefix as the teacherUid to maintain consistency with previous logic
           const teacherUid = firebaseUser.email?.split('@')[0] || firebaseUser.uid;
           
-          // Special case for hardcoded Admin
-          if (teacherUid === 'admin' && firebaseUser.email === 'admin@tutorflow.com') {
+          // Special case for hardcoded Admin and User Email
+          const isAdminEmail = firebaseUser.email === 'admin@tutorflow.com' || firebaseUser.email === 'mrhandsome81091@gmail.com';
+          if (isAdminEmail) {
             const adminData: Teacher = {
-              uid: 'admin',
-              name: 'Administrator',
-              email: 'admin@tutorflow.com',
+              uid: teacherUid,
+              name: firebaseUser.displayName || (firebaseUser.email === 'admin@tutorflow.com' ? 'Administrator' : 'Admin User'),
+              email: firebaseUser.email || '',
               role: 'admin',
               plan: 'Enterprise',
               planStartDate: new Date().toISOString(),
@@ -79,9 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               createdAt: new Date().toISOString(),
             };
             setTeacher(adminData);
-            setUser({ uid: 'admin', email: adminData.email, displayName: adminData.name });
+            setUser({ uid: teacherUid, email: adminData.email, displayName: adminData.name });
             applyTheme('dark');
-            // We still try to fetch from Firestore to get any updates, but we have a baseline
           }
 
           const teacherRef = doc(db, 'teachers', teacherUid);

@@ -22,20 +22,19 @@ import {
 import { collection, query, onSnapshot, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { Teacher, SubscriptionPlan } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
 
 export default function Admin() {
+  const { user, teacher, logout, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return sessionStorage.getItem('isAdminAuthenticated') === 'true';
+    return sessionStorage.getItem('isAdminAuthenticated') === 'true' || teacher?.role === 'admin';
   });
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  
+
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,19 +42,12 @@ export default function Admin() {
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
 
-  const { user, teacher, loading: authLoading } = useAuth();
-  const navigate = useNavigate();
-
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (username === 'Admin' && password === 'Aayat@250522') {
+  useEffect(() => {
+    if (teacher?.role === 'admin' && !isAuthenticated) {
       setIsAuthenticated(true);
       sessionStorage.setItem('isAdminAuthenticated', 'true');
-      setError('');
-    } else {
-      setError('Invalid admin credentials');
     }
-  };
+  }, [teacher, isAuthenticated]);
 
   const fetchTeachers = () => {
     if (loading && teachers.length > 0) return; // Already loading
@@ -161,81 +153,7 @@ export default function Admin() {
   }
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-[80vh] flex items-center justify-center p-4">
-        <motion.div 
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="w-full max-w-md bg-white rounded-3xl border border-slate-200 shadow-2xl p-10"
-        >
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center text-white mb-4 shadow-xl shadow-blue-100">
-              <Shield size={32} />
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
-            <p className="text-slate-500 text-sm">Secure access for system administrators</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-6">
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Username</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Users size={18} className="text-slate-400" />
-                </div>
-                <input
-                  type="text"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                  placeholder="Enter admin username"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-bold text-slate-700 ml-1">Password</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Lock size={18} className="text-slate-400" />
-                </div>
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="block w-full pl-11 pr-12 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
-                  placeholder="Enter admin password"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-400 hover:text-slate-600 transition-colors"
-                >
-                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-                </button>
-              </div>
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 text-red-600 bg-red-50 p-3 rounded-xl text-sm font-medium">
-                <AlertCircle size={16} />
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="w-full py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 shadow-xl shadow-slate-200 transition-all flex items-center justify-center gap-2"
-            >
-              <ChevronRight size={20} />
-              Access Dashboard
-            </button>
-          </form>
-        </motion.div>
-      </div>
-    );
+    return <Navigate to="/admin/login" />;
   }
 
   return (
@@ -275,9 +193,10 @@ export default function Admin() {
               <span className="text-sm font-bold hidden md:inline">Refresh</span>
             </button>
             <button
-              onClick={() => {
+              onClick={async () => {
                 sessionStorage.removeItem('isAdminAuthenticated');
-                window.location.href = '/login';
+                await logout();
+                navigate('/login');
               }}
               className="px-5 py-3 text-red-600 bg-red-50 border border-red-100 rounded-2xl hover:bg-red-100 transition-colors font-bold flex items-center gap-2"
             >

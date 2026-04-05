@@ -34,63 +34,23 @@ export default function Login() {
     setIsLoggingIn(true);
     setError(null);
 
-    const email = `${username.toLowerCase().replace(/\s+/g, '_')}@tutorflow.com`;
-    const teacherUid = username.toLowerCase().replace(/\s+/g, '_');
+    let email = username;
+    let teacherUid = username.toLowerCase().replace(/\s+/g, '_');
+
+    if (!username.includes('@')) {
+      email = `${username.toLowerCase().replace(/\s+/g, '_')}@tutorflow.com`;
+    } else {
+      teacherUid = username.split('@')[0];
+    }
 
     try {
-      // 1. Check for hardcoded Admin
-      if (username === 'Admin' && password === 'Aayat@250522') {
-        try {
-          await signInWithEmailAndPassword(auth, email, password);
-        } catch (err: any) {
-          if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-            // Try to create the admin user first
-            try {
-              await createUserWithEmailAndPassword(auth, email, password);
-            } catch (createErr: any) {
-              if (createErr.code === 'auth/email-already-in-use') {
-                // Admin exists but password was wrong (shouldn't happen with hardcoded)
-                throw err;
-              }
-              throw createErr;
-            }
-          } else {
-            throw err;
-          }
-        }
-
-        const adminData: Teacher = {
-          uid: teacherUid,
-          name: 'Administrator',
-          email: email,
-          role: 'admin',
-          plan: 'Enterprise',
-          planStartDate: new Date().toISOString(),
-          theme: 'dark',
-          notifications: {
-            email: true,
-            whatsapp: true,
-            paymentReminders: true,
-          },
-          createdAt: new Date().toISOString(),
-        };
-        
-        // Now that we are authenticated, we can safely check/set Firestore
-        const adminRef = doc(db, 'teachers', teacherUid);
-        const adminSnap = await getDoc(adminRef);
-        if (!adminSnap.exists()) {
-          await setDoc(adminRef, adminData);
-        }
-
-        login(teacherUid, adminData);
-        sessionStorage.setItem('isAdminAuthenticated', 'true');
-        navigate('/admin');
-        return;
-      }
-
-      // 2. Try to sign in with Firebase Auth
+      // 1. Try to sign in with Firebase Auth
       try {
-        await signInWithEmailAndPassword(auth, email, password);
+        const userCredential = await signInWithEmailAndPassword(auth, email, password);
+        const firebaseUser = userCredential.user;
+        
+        // Special case for admins
+        const isAdminEmail = firebaseUser.email === 'admin@tutorflow.com' || firebaseUser.email === 'mrhandsome81091@gmail.com';
         
         const teacherRef = doc(db, 'teachers', teacherUid);
         const teacherSnap = await getDoc(teacherRef);
@@ -98,16 +58,44 @@ export default function Login() {
         if (teacherSnap.exists()) {
           const data = teacherSnap.data() as Teacher;
           login(teacherUid, data);
-          navigate('/');
+          if (data.role === 'admin' || isAdminEmail) {
+            sessionStorage.setItem('isAdminAuthenticated', 'true');
+            navigate('/admin');
+          } else {
+            navigate('/');
+          }
+        } else if (isAdminEmail) {
+          // Admin might not have a record yet
+          const adminData: Teacher = {
+            uid: teacherUid,
+            name: firebaseUser.displayName || 'Admin User',
+            email: firebaseUser.email || '',
+            role: 'admin',
+            plan: 'Enterprise',
+            planStartDate: new Date().toISOString(),
+            theme: 'dark',
+            notifications: {
+              email: true,
+              whatsapp: true,
+              paymentReminders: true,
+            },
+            createdAt: new Date().toISOString(),
+          };
+          await setDoc(teacherRef, adminData);
+          login(teacherUid, adminData);
+          sessionStorage.setItem('isAdminAuthenticated', 'true');
+          navigate('/admin');
         } else {
-          // This should ideally not happen if Auth user exists
           setError('Teacher profile not found.');
         }
       } catch (err: any) {
         if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-          // 3. Create new Teacher account if not found
-          // We try to create the Auth user first. If it fails with email-already-in-use,
-          // then we know the password was wrong.
+          // 2. Create new Teacher account if not found (only for non-admin emails)
+          if (email === 'admin@tutorflow.com' || email === 'mrhandsome81091@gmail.com') {
+            setError('Invalid admin credentials.');
+            return;
+          }
+
           try {
             await createUserWithEmailAndPassword(auth, email, password);
           } catch (createErr: any) {
@@ -123,7 +111,6 @@ export default function Login() {
             uid: teacherUid,
             name: username,
             email: email,
-            password: password,
             role: 'teacher',
             plan: 'Free',
             planStartDate: new Date().toISOString(),
@@ -242,7 +229,7 @@ export default function Login() {
 
           <div className="mt-10 pt-6 border-t border-slate-100 text-center">
             <p className="text-slate-400 text-xs">
-              Secure access for teachers and administrators.
+              Secure access for teachers.
             </p>
           </div>
         </motion.div>

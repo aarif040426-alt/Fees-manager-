@@ -9,6 +9,7 @@ import Reports from './pages/Reports';
 import Settings from './pages/Settings';
 import Login from './pages/Login';
 import Admin from './pages/Admin';
+import AdminLogin from './pages/AdminLogin';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ children, adminOnly }) => {
   const { user, teacher, loading } = useAuth();
@@ -22,7 +23,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean 
   }
 
   if (!user) {
-    return <Navigate to="/login" />;
+    return <Navigate to={adminOnly ? "/admin/login" : "/login"} />;
   }
 
   if (adminOnly && teacher?.role !== 'admin') {
@@ -38,6 +39,7 @@ export default function App() {
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
           <Route
             path="/admin"
             element={

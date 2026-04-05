@@ -320,6 +320,7 @@ export const AnnualReportModal = ({
         try {
           const q = query(
             collection(db, 'payments'),
+            where('teacherId', '==', student.teacherId),
             where('studentId', '==', student.id),
             orderBy('month', 'desc')
           );

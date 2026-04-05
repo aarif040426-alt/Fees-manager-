@@ -12,10 +12,13 @@ import {
   BookOpen,
   X,
   Check,
-  AlertCircle
+  AlertCircle,
+  Camera,
+  Upload
 } from 'lucide-react';
 import { collection, query, where, onSnapshot, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, storage, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { Student, Board } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -23,6 +26,8 @@ import { format } from 'date-fns';
 import { PLAN_LIMITS } from '../constants';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+import { AlertModal, ConfirmModal } from '../components/UIModals';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -46,8 +51,11 @@ const StudentModal = ({
     board: 'SSC' as Board,
     standard: '',
     feeAmount: 0,
-    joiningDate: format(new Date(), 'yyyy-MM-dd')
+    joiningDate: format(new Date(), 'yyyy-MM-dd'),
+    photoUrl: ''
   });
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -59,8 +67,10 @@ const StudentModal = ({
         board: student.board,
         standard: student.standard || '',
         feeAmount: student.feeAmount,
-        joiningDate: student.joiningDate || format(new Date(), 'yyyy-MM-dd')
+        joiningDate: student.joiningDate || format(new Date(), 'yyyy-MM-dd'),
+        photoUrl: student.photoUrl || ''
       });
+      setPhotoPreview(student.photoUrl || null);
     } else {
       setFormData({
         name: '',
@@ -69,26 +79,58 @@ const StudentModal = ({
         board: 'SSC',
         standard: '',
         feeAmount: 0,
-        joiningDate: format(new Date(), 'yyyy-MM-dd')
+        joiningDate: format(new Date(), 'yyyy-MM-dd'),
+        photoUrl: ''
       });
+      setPhotoPreview(null);
     }
+    setPhotoFile(null);
   }, [student, isOpen]);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadPhoto = async (file: File, studentId: string): Promise<string> => {
+    const storageRef = ref(storage, `students/${studentId}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    return await getDownloadURL(storageRef);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
+      let currentPhotoUrl = formData.photoUrl;
+
       if (student) {
+        if (photoFile) {
+          currentPhotoUrl = await uploadPhoto(photoFile, student.id);
+        }
         await updateDoc(doc(db, 'students', student.id), {
           ...formData,
+          photoUrl: currentPhotoUrl,
           updatedAt: serverTimestamp()
         });
       } else {
-        await addDoc(collection(db, 'students'), {
+        const docRef = await addDoc(collection(db, 'students'), {
           ...formData,
           teacherId,
           createdAt: serverTimestamp()
         });
+        
+        if (photoFile) {
+          const uploadedUrl = await uploadPhoto(photoFile, docRef.id);
+          await updateDoc(docRef, { photoUrl: uploadedUrl });
+        }
       }
       onClose();
     } catch (err) {
@@ -130,6 +172,34 @@ const StudentModal = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+          {/* Photo Upload Section */}
+          <div className="flex flex-col items-center justify-center space-y-4 pb-4 border-b border-slate-100">
+            <div className="relative group">
+              <div className="w-32 h-32 rounded-3xl bg-slate-100 border-2 border-dashed border-slate-200 overflow-hidden flex items-center justify-center transition-all group-hover:border-blue-400 group-hover:bg-blue-50">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="flex flex-col items-center text-slate-400 group-hover:text-blue-500">
+                    <Camera size={32} strokeWidth={1.5} />
+                    <span className="text-xs font-bold mt-2">Add Photo</span>
+                  </div>
+                )}
+              </div>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="absolute inset-0 opacity-0 cursor-pointer"
+              />
+              {photoPreview && (
+                <div className="absolute -bottom-2 -right-2 bg-blue-600 text-white p-2 rounded-xl shadow-lg border-2 border-white">
+                  <Upload size={16} />
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-slate-500 font-medium italic">Click to upload student profile picture</p>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700 ml-1">Student Name*</label>
@@ -238,6 +308,18 @@ export default function Students() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [loading, setLoading] = useState(true);
+  const [alertData, setAlertData] = useState<{ isOpen: boolean; title: string; message: string; type: 'info' | 'success' | 'warning' | 'error' }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+  const [confirmData, setConfirmData] = useState<{ isOpen: boolean; title: string; message: string; onConfirm: () => void }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {}
+  });
 
   useEffect(() => {
     if (!user) return;
@@ -266,12 +348,18 @@ export default function Students() {
   const isLimitReached = students.length >= planLimit.maxStudents;
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this student? All payment records will remain but the student will be removed.')) return;
-    try {
-      await deleteDoc(doc(db, 'students', id));
-    } catch (err) {
-      handleFirestoreError(err, OperationType.DELETE, 'students');
-    }
+    setConfirmData({
+      isOpen: true,
+      title: 'Delete Student?',
+      message: 'Are you sure you want to delete this student? All payment records will remain but the student will be removed.',
+      onConfirm: async () => {
+        try {
+          await deleteDoc(doc(db, 'students', id));
+        } catch (err) {
+          handleFirestoreError(err, OperationType.DELETE, 'students');
+        }
+      }
+    });
   };
 
   return (
@@ -285,7 +373,12 @@ export default function Students() {
         <button
           onClick={() => {
             if (isLimitReached) {
-              alert(`You have reached the limit of ${planLimit.maxStudents} students for your ${teacher?.plan} plan. Please upgrade to add more students.`);
+              setAlertData({
+                isOpen: true,
+                title: 'Student Limit Reached',
+                message: `You have reached the limit of ${planLimit.maxStudents} students for your ${teacher?.plan} plan. Please upgrade to add more students.`,
+                type: 'warning'
+              });
               return;
             }
             setEditingStudent(null);
@@ -338,8 +431,12 @@ export default function Students() {
               >
                 <div className="flex items-start justify-between mb-6">
                   <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600 text-xl font-bold shadow-inner">
-                      {student.name[0]}
+                    <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-slate-100 overflow-hidden flex items-center justify-center text-blue-600 text-xl font-bold shadow-inner">
+                      {student.photoUrl ? (
+                        <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                      ) : (
+                        student.name[0]
+                      )}
                     </div>
                     <div>
                       <h3 className="text-lg font-bold text-slate-900 tracking-tight">{student.name}</h3>
@@ -438,6 +535,24 @@ export default function Students() {
           />
         )}
       </AnimatePresence>
+
+      <AlertModal
+        isOpen={alertData.isOpen}
+        onClose={() => setAlertData({ ...alertData, isOpen: false })}
+        title={alertData.title}
+        message={alertData.message}
+        type={alertData.type}
+      />
+
+      <ConfirmModal
+        isOpen={confirmData.isOpen}
+        onClose={() => setConfirmData({ ...confirmData, isOpen: false })}
+        onConfirm={confirmData.onConfirm}
+        title={confirmData.title}
+        message={confirmData.message}
+        isDestructive
+        confirmLabel="Yes, Delete Student"
+      />
     </div>
   );
 }

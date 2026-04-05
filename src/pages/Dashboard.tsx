@@ -17,7 +17,7 @@ import {
   FileText,
   Receipt
 } from 'lucide-react';
-import { format, addMonths, subMonths, startOfMonth, endOfMonth, isSameMonth } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth, isSameMonth, isAfter, parseISO } from 'date-fns';
 import { collection, query, where, onSnapshot, doc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
@@ -158,6 +158,33 @@ export default function Dashboard() {
     window.open(whatsappUrl, '_blank');
   };
 
+  const getNextDueDate = (student: Student) => {
+    // Find the latest payment for this student
+    const studentPayments = payments
+      .filter(p => p.studentId === student.id && p.status === 'Paid')
+      .sort((a, b) => b.month.localeCompare(a.month));
+
+    let nextMonth: Date;
+    if (studentPayments.length > 0) {
+      const lastPaymentMonth = parseISO(`${studentPayments[0].month}-01`);
+      nextMonth = addMonths(lastPaymentMonth, 1);
+    } else {
+      // If no payments, use joining date or current month
+      nextMonth = student.joiningDate ? parseISO(student.joiningDate) : startOfMonth(new Date());
+    }
+
+    // If nextMonth is in the past compared to current selected month, 
+    // and current month is not paid, next due is current month
+    const currentMonthStart = startOfMonth(selectedMonth);
+    const isCurrentPaid = payments.some(p => p.studentId === student.id && p.month === format(selectedMonth, 'yyyy-MM') && p.status === 'Paid');
+    
+    if (!isCurrentPaid && isAfter(currentMonthStart, nextMonth)) {
+      return currentMonthStart;
+    }
+
+    return nextMonth;
+  };
+
   const changeMonth = (offset: number) => {
     setSelectedMonth(prev => offset > 0 ? addMonths(prev, 1) : subMonths(prev, 1));
   };
@@ -274,12 +301,21 @@ export default function Dashboard() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
-                            {student.name[0]}
+                          <div className="w-12 h-12 rounded-2xl bg-slate-100 border border-slate-200 overflow-hidden flex items-center justify-center text-blue-600 font-bold shadow-sm">
+                            {student.photoUrl ? (
+                              <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              student.name[0]
+                            )}
                           </div>
                           <div>
                             <p className="font-bold text-slate-800">{student.name}</p>
-                            <p className="text-xs text-slate-500">{student.parentName}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <Clock size={10} className="text-slate-400" />
+                              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                                Next Due: {format(getNextDueDate(student), 'MMM yyyy')}
+                              </p>
+                            </div>
                           </div>
                         </div>
                       </td>

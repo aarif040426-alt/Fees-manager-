@@ -58,6 +58,42 @@ export default function Payments() {
 
   const monthKey = format(selectedMonth, 'yyyy-MM');
 
+  const handleExportCSV = () => {
+    if (filteredPayments.length === 0) return;
+
+    const headers = ['Student Name', 'Parent Name', 'Mobile', 'Board', 'Standard', 'Month', 'Amount', 'Method', 'Status', 'Paid At'];
+    const rows = filteredPayments.map(p => {
+      const student = students.find(s => s.id === p.studentId);
+      return [
+        student?.name || 'Unknown',
+        student?.parentName || 'N/A',
+        student?.mobile || 'N/A',
+        student?.board || 'N/A',
+        student?.standard || 'N/A',
+        format(new Date(p.month + '-01'), 'MMMM yyyy'),
+        p.amount || 0,
+        p.method || 'Cash',
+        p.status,
+        p.paidAt ? format(new Date(p.paidAt), 'dd MMM yyyy') : 'N/A'
+      ];
+    });
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `payments_${monthKey}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   useEffect(() => {
     if (!user) return;
 
@@ -188,7 +224,11 @@ export default function Payments() {
             />
           </div>
           
-          <button className="flex items-center gap-2 px-6 py-3 text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-colors font-bold">
+          <button 
+            onClick={handleExportCSV}
+            disabled={filteredPayments.length === 0}
+            className="flex items-center gap-2 px-6 py-3 text-slate-600 bg-slate-50 border border-slate-200 rounded-2xl hover:bg-slate-100 transition-colors font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <Download size={18} />
             <span>Export CSV</span>
           </button>
