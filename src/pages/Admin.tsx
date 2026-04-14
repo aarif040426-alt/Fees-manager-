@@ -23,7 +23,7 @@ import {
   Zap,
   X
 } from 'lucide-react';
-import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc, where, orderBy } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc, where, orderBy, setDoc } from 'firebase/firestore';
 import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
@@ -204,6 +204,12 @@ export default function Admin() {
         status,
         updatedAt: new Date().toISOString()
       });
+
+      // Keep public status in sync
+      await setDoc(doc(db, 'teacher_status', teacherId), {
+        status,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
     } catch (err) {
       handleFirestoreError(err, OperationType.UPDATE, 'teachers');
     } finally {
@@ -223,6 +229,7 @@ export default function Admin() {
   const handleDeleteTeacher = async (teacherId: string) => {
     try {
       await deleteDoc(doc(db, 'teachers', teacherId));
+      await deleteDoc(doc(db, 'teacher_status', teacherId));
       setTeachers(prev => prev.filter(t => t.uid !== teacherId));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, 'teachers');

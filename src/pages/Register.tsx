@@ -17,6 +17,7 @@ export default function Register() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isRegistered, setIsRegistered] = useState(false);
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -24,9 +25,10 @@ export default function Register() {
     setError(null);
     setSuccess(null);
 
-    // Validate mobile number (basic)
-    if (mobile.length < 10) {
-      setError('Please enter a valid mobile number.');
+    // Validate mobile number (basic regex for 10 digits)
+    const mobileRegex = /^[0-9]{10}$/;
+    if (!mobileRegex.test(mobile.replace(/\s+/g, ''))) {
+      setError('Please enter a valid 10-digit mobile number.');
       setIsRegistering(false);
       return;
     }
@@ -68,14 +70,17 @@ export default function Register() {
 
       await setDoc(doc(db, 'teachers', teacherUid), newTeacher);
       
-      setSuccess('Registration successful! Please wait for admin approval before logging in.');
+      // 3. Create a public status record for unauthenticated checks
+      await setDoc(doc(db, 'teacher_status', teacherUid), {
+        name: name,
+        status: 'pending',
+        updatedAt: new Date().toISOString()
+      });
+      
+      setIsRegistered(true);
       
       // Sign out immediately so they can't access dashboard yet
       await auth.signOut();
-      
-      setTimeout(() => {
-        navigate('/');
-      }, 5000);
     } catch (err: any) {
       console.error("Registration error:", err);
       if (err.code === 'auth/email-already-in-use') {
@@ -96,6 +101,34 @@ export default function Register() {
       setIsRegistering(false);
     }
   };
+
+  if (isRegistered) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full bg-white rounded-3xl shadow-xl shadow-blue-100 p-8 md:p-12 border border-slate-100 text-center"
+        >
+          <div className="w-20 h-20 bg-green-100 text-green-600 rounded-3xl flex items-center justify-center mx-auto mb-8">
+            <CheckCircle2 size={40} />
+          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-4 tracking-tight">Registration Successful!</h1>
+          <div className="space-y-4 text-slate-600 mb-10">
+            <p>Your account has been created and is currently <span className="font-bold text-orange-600">pending admin approval</span>.</p>
+            <p className="text-sm">The administrator will review your request shortly. You will be able to log in once your account is activated.</p>
+          </div>
+          <Link
+            to="/"
+            className="w-full bg-blue-600 text-white font-bold py-4 px-6 rounded-2xl hover:bg-blue-700 transition-all duration-200 shadow-lg shadow-blue-200 flex items-center justify-center gap-2 group"
+          >
+            <span>Return to Login</span>
+            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6">

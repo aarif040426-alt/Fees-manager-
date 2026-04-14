@@ -81,6 +81,14 @@ service cloud.firestore {
       return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
     }
 
+    function statusUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status']);
+    }
+
+    function roleUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']);
+    }
+
     // ===============================================================
     // Domain Validators
     // ===============================================================
@@ -158,11 +166,23 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /teacher_status/{teacherId} {
+      allow get: if true; // Allow public status checks
+      allow create: if isAuthenticated() && isOwner(teacherId);
+      allow update, delete: if isAdmin();
+    }
+
     match /teachers/{teacherId} {
       allow read: if isOwner(teacherId) || isAdmin();
       allow list: if isAdmin();
-      allow create: if isAuthenticated() && isValidTeacher(request.resource.data) && (isOwner(teacherId) || isAdmin());
-      allow update: if isAuthenticated() && isValidTeacher(request.resource.data) && (isOwner(teacherId) || isAdmin());
+      allow create: if isAuthenticated() && 
+                      isValidTeacher(request.resource.data) && 
+                      isOwner(teacherId) &&
+                      request.resource.data.get('status', 'pending') == 'pending' &&
+                      request.resource.data.role == 'teacher';
+      allow update: if isAuthenticated() && 
+                      isValidTeacher(request.resource.data) && 
+                      (isAdmin() || (isOwner(teacherId) && statusUnchanged() && roleUnchanged()));
       allow delete: if isAdmin();
     }
 

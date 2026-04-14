@@ -72,12 +72,27 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["teacherId", "requestedPlan", "status", "createdAt"]
+    },
+    "TeacherStatus": {
+      "title": "TeacherStatus",
+      "description": "Publicly accessible teacher approval status.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status"]
     }
   },
   "firestore": {
     "/teachers/{teacherId}": {
       "schema": "Teacher",
       "description": "Teacher profiles"
+    },
+    "/teacher_status/{teacherId}": {
+      "schema": "TeacherStatus",
+      "description": "Public teacher status for unauthenticated checks"
     },
     "/students/{studentId}": {
       "schema": "Student",

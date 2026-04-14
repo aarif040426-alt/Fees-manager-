@@ -4,7 +4,7 @@ import { db, auth } from '../lib/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useAuth } from '../lib/AuthContext';
-import { GraduationCap, User, Lock, ArrowRight, Shield, AlertCircle, ChevronRight, Eye, EyeOff, Mail, CheckCircle2 } from 'lucide-react';
+import { GraduationCap, User, Lock, ArrowRight, Shield, AlertCircle, ChevronRight, Eye, EyeOff, Mail, CheckCircle2, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Teacher } from '../types';
 
@@ -18,6 +18,39 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [isCheckingStatus, setIsCheckingStatus] = useState(false);
+  const [statusResult, setStatusResult] = useState<{ status: string; name: string } | null>(null);
+
+  const handleCheckStatus = async () => {
+    if (!username) {
+      setError('Please enter your username or email first.');
+      return;
+    }
+
+    setIsCheckingStatus(true);
+    setError(null);
+    setStatusResult(null);
+
+    let teacherUid = username.toLowerCase().replace(/\s+/g, '_');
+    if (username.includes('@')) {
+      teacherUid = username.split('@')[0];
+    }
+
+    try {
+      const statusSnap = await getDoc(doc(db, 'teacher_status', teacherUid));
+      if (statusSnap.exists()) {
+        const data = statusSnap.data();
+        setStatusResult({ status: data.status || 'pending', name: data.name || 'Teacher' });
+      } else {
+        setError('Account not found. Please register first.');
+      }
+    } catch (err: any) {
+      console.error("Status check error:", err);
+      setError('Could not verify status. Please try again later.');
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -145,6 +178,14 @@ export default function Login() {
           createdAt: new Date().toISOString(),
         };
         await setDoc(teacherRef, adminData);
+        
+        // Also create public status for admin
+        await setDoc(doc(db, 'teacher_status', teacherUid), {
+          name: adminData.name,
+          status: 'approved',
+          updatedAt: new Date().toISOString()
+        });
+
         login(teacherUid, adminData);
         sessionStorage.setItem('isAdminAuthenticated', 'true');
         navigate('/admin');
@@ -208,6 +249,33 @@ export default function Login() {
             </div>
           )}
 
+          {statusResult && (
+            <div className={`px-4 py-4 rounded-xl mb-6 border flex items-start gap-3 ${
+              statusResult.status === 'approved' 
+                ? "bg-green-50 border-green-100 text-green-700" 
+                : statusResult.status === 'rejected'
+                ? "bg-red-50 border-red-100 text-red-700"
+                : "bg-orange-50 border-orange-100 text-orange-700"
+            }`}>
+              <div className="mt-0.5">
+                {statusResult.status === 'approved' ? <CheckCircle2 size={18} /> : statusResult.status === 'rejected' ? <X size={18} /> : <RefreshCw size={18} className="animate-spin" />}
+              </div>
+              <div>
+                <p className="text-sm font-bold">Status: {statusResult.status.charAt(0).toUpperCase() + statusResult.status.slice(1)}</p>
+                <p className="text-xs mt-0.5 opacity-80">
+                  {statusResult.status === 'approved' 
+                    ? `Great news, ${statusResult.name}! Your account is active. You can log in now.` 
+                    : statusResult.status === 'rejected'
+                    ? `Sorry, ${statusResult.name}. Your registration was not approved.`
+                    : `Hang tight, ${statusResult.name}! Admin is still reviewing your request.`}
+                </p>
+              </div>
+              <button onClick={() => setStatusResult(null)} className="ml-auto text-current opacity-50 hover:opacity-100">
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           <form onSubmit={handleLogin} className="space-y-6">
             <div className="space-y-2">
               <label className="text-sm font-bold text-slate-700 ml-1">Username / Email</label>
@@ -224,9 +292,20 @@ export default function Login() {
                   placeholder="Enter your username or email"
                 />
               </div>
-              <p className="text-[10px] text-slate-400 ml-1">
-                Hint: If you registered with a username, use that same username here.
-              </p>
+              <div className="flex items-center justify-between ml-1">
+                <p className="text-[10px] text-slate-400">
+                  Hint: If you registered with a username, use that same username here.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleCheckStatus}
+                  disabled={isCheckingStatus}
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-700 transition-colors flex items-center gap-1"
+                >
+                  {isCheckingStatus ? <RefreshCw size={10} className="animate-spin" /> : <Shield size={10} />}
+                  Check Approval Status
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
