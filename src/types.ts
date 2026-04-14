@@ -46,3 +46,17 @@ export interface Payment {
   method?: PaymentMethod;
   paidAt?: string;
 }
+
+export type PlanRequestStatus = 'Pending' | 'Approved' | 'Rejected';
+
+export interface PlanRequest {
+  id: string;
+  teacherId: string;
+  teacherName: string;
+  teacherEmail: string;
+  currentPlan: SubscriptionPlan;
+  requestedPlan: SubscriptionPlan;
+  status: PlanRequestStatus;
+  createdAt: string;
+  updatedAt?: string;
+}

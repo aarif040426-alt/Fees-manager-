@@ -263,8 +263,12 @@ export default function Payments() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs">
-                            {student?.name[0] || 'S'}
+                          <div className="w-8 h-8 rounded-lg bg-blue-50 border border-slate-100 overflow-hidden flex items-center justify-center text-blue-600 font-bold text-xs shadow-inner">
+                            {student?.photoUrl ? (
+                              <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              student?.name[0] || 'S'
+                            )}
                           </div>
                           <span className="font-bold text-slate-800">{student?.name || 'Unknown Student'}</span>
                         </div>
@@ -349,8 +353,12 @@ export default function Payments() {
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
-                        {student?.name[0] || 'S'}
+                      <div className="w-10 h-10 rounded-xl bg-blue-50 border border-slate-100 overflow-hidden flex items-center justify-center text-blue-600 font-bold shadow-inner">
+                        {student?.photoUrl ? (
+                          <img src={student.photoUrl} alt={student.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                        ) : (
+                          student?.name[0] || 'S'
+                        )}
                       </div>
                       <div>
                         <p className="font-bold text-slate-800">{student?.name || 'Unknown Student'}</p>

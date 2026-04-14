@@ -42,11 +42,11 @@ const SidebarItem = ({
     className={cn(
       "flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 group",
       active 
-        ? "bg-[#2563eb] text-[#ffffff] shadow-lg shadow-[#bfdbfe]" 
-        : "text-[#475569] hover:bg-[#eff6ff] hover:text-[#2563eb]"
+        ? "bg-blue-600 text-white shadow-lg shadow-blue-100" 
+        : "text-slate-600 hover:bg-blue-50 hover:text-blue-600"
     )}
   >
-    <Icon size={20} className={cn("transition-transform duration-200 group-hover:scale-110", active ? "text-[#ffffff]" : "text-[#94a3b8] group-hover:text-[#2563eb]")} />
+    <Icon size={20} className={cn("transition-transform duration-200 group-hover:scale-110", active ? "text-white" : "text-slate-400 group-hover:text-blue-600")} />
     <span className="font-medium">{label}</span>
   </Link>
 );
@@ -55,19 +55,12 @@ export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { teacher, logout } = useAuth();
+  const { teacher, logout, isRealAdmin } = useAuth();
 
   const handleLogout = async () => {
     await logout();
     navigate('/');
   };
-
-  const handleStopImpersonation = () => {
-    sessionStorage.removeItem('impersonatedTeacherUid');
-    window.location.reload();
-  };
-
-  const isImpersonating = !!sessionStorage.getItem('impersonatedTeacherUid');
 
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -75,27 +68,11 @@ export default function Layout() {
     { to: '/dashboard/payments', icon: CreditCard, label: 'Payments' },
     { to: '/dashboard/reports', icon: BarChart3, label: 'Reports' },
     { to: '/dashboard/settings', icon: Settings, label: 'Settings' },
-    ...(teacher?.role === 'admin' ? [{ to: '/admin', icon: Shield, label: 'Admin Panel' }] : []),
+    ...(isRealAdmin ? [{ to: '/admin', icon: Shield, label: 'Admin Panel' }] : []),
   ];
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex">
-      {/* Impersonation Banner */}
-      {isImpersonating && (
-        <div className="fixed top-0 left-0 right-0 h-12 bg-[#2563eb] text-[#ffffff] flex items-center justify-between px-6 z-[60] shadow-lg">
-          <div className="flex items-center gap-2 text-sm font-bold">
-            <Shield size={18} />
-            <span>Viewing as: {teacher?.name} ({teacher?.email})</span>
-          </div>
-          <button 
-            onClick={handleStopImpersonation}
-            className="bg-[#ffffff] text-[#2563eb] px-3 py-1 rounded-lg text-xs font-bold hover:bg-[#eff6ff] transition-colors"
-          >
-            Stop Viewing
-          </button>
-        </div>
-      )}
-
+    <div className="min-h-screen bg-slate-50 flex">
       {/* Mobile Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
@@ -112,16 +89,16 @@ export default function Layout() {
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-64 bg-[#ffffff] border-r border-[#e2e8f0] transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
         <div className="h-full flex flex-col p-6">
           <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="bg-[#2563eb] p-2 rounded-xl shadow-lg shadow-[#bfdbfe]">
-              <GraduationCap className="text-[#ffffff]" size={24} />
+            <div className="bg-blue-600 p-2 rounded-xl shadow-lg shadow-blue-100">
+              <GraduationCap className="text-white" size={24} />
             </div>
-            <h1 className="text-xl font-bold text-[#1e293b] tracking-tight">TutorFlow</h1>
+            <h1 className="text-xl font-bold text-slate-900 tracking-tight">TutorFlow</h1>
           </div>
 
           <nav className="flex-1 space-y-2">
@@ -135,21 +112,25 @@ export default function Layout() {
             ))}
           </nav>
 
-          <div className="mt-auto pt-6 border-t border-[#f1f5f9]">
+          <div className="mt-auto pt-6 border-t border-slate-100">
             <div className="flex items-center gap-3 px-2 mb-6">
-              <div className="w-10 h-10 rounded-full bg-[#dbeafe] flex items-center justify-center text-[#2563eb] font-bold">
-                {teacher?.name?.[0] || 'T'}
+              <div className="w-10 h-10 rounded-full bg-blue-50 border border-slate-100 overflow-hidden flex items-center justify-center text-blue-600 font-bold shadow-inner">
+                {teacher?.photoUrl ? (
+                  <img src={teacher.photoUrl} alt={teacher.name || 'Teacher'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                ) : (
+                  teacher?.name?.[0] || 'T'
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-[#1e293b] truncate">{teacher?.name || 'Teacher'}</p>
-                <p className="text-xs text-[#64748b] truncate">{teacher?.email}</p>
+                <p className="text-sm font-semibold text-slate-900 truncate">{teacher?.name || 'Teacher'}</p>
+                <p className="text-xs text-slate-500 truncate">{teacher?.email}</p>
               </div>
             </div>
             <button
               onClick={handleLogout}
-              className="flex items-center gap-3 w-full px-4 py-3 text-[#475569] hover:bg-[#fef2f2] hover:text-[#dc2626] rounded-lg transition-colors duration-200 group"
+              className="flex items-center gap-3 w-full px-4 py-3 text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors duration-200 group"
             >
-              <LogOut size={20} className="text-[#94a3b8] group-hover:text-[#dc2626]" />
+              <LogOut size={20} className="text-slate-400 group-hover:text-red-600" />
               <span className="font-medium">Logout</span>
             </button>
           </div>
@@ -157,21 +138,18 @@ export default function Layout() {
       </aside>
 
       {/* Main Content */}
-      <main className={cn(
-        "flex-1 flex flex-col min-w-0 overflow-hidden",
-        isImpersonating && "pt-12"
-      )}>
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Header */}
-        <header className="h-16 bg-[#ffffff] border-b border-[#e2e8f0] flex items-center justify-between px-6 sticky top-0 z-30">
+        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 sticky top-0 z-30">
           <button
             onClick={() => setIsSidebarOpen(true)}
-            className="p-2 text-[#475569] hover:bg-[#f1f5f9] rounded-lg lg:hidden"
+            className="p-2 text-slate-600 hover:bg-slate-50 rounded-lg lg:hidden"
           >
             <Menu size={24} />
           </button>
           
           <div className="flex-1 lg:flex-none">
-            <h2 className="text-lg font-semibold text-[#1e293b] lg:hidden">
+            <h2 className="text-lg font-semibold text-slate-900 lg:hidden">
               {navItems.find(i => i.to === location.pathname)?.label || 'TutorFlow'}
             </h2>
           </div>

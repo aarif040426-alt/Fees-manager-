@@ -9,7 +9,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { Teacher } from '../types';
 
 export default function AdminLogin() {
-  const { user, teacher, login, loading } = useAuth();
+  const { user, teacher, login, loading, isRealAdmin } = useAuth();
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -27,10 +27,6 @@ export default function AdminLogin() {
     );
   }
 
-  if (user && teacher?.role === 'admin') {
-    return <Navigate to="/admin" />;
-  }
-
   const handleForgotPassword = async () => {
     if (!username) {
       setError('Please enter your admin username or email first.');
@@ -43,9 +39,9 @@ export default function AdminLogin() {
 
     let email = username;
     if (!username.includes('@')) {
-      if (username === 'Admin') {
+      if (username.toLowerCase() === 'admin') {
         email = 'admin@tutorflow.com';
-      } else if (username === 'mrhandsome81091') {
+      } else if (username.toLowerCase() === 'mrhandsome81091') {
         email = 'mrhandsome81091@gmail.com';
       } else {
         setError('Please enter your admin username or email first.');
@@ -75,12 +71,12 @@ export default function AdminLogin() {
       let email = '';
       let isHardcodedAdmin = false;
 
-      if (username === 'Admin' && password === 'Aayat@250522') {
+      if (username.toLowerCase() === 'admin' && password === 'Aayat@250522') {
         email = 'admin@tutorflow.com';
         isHardcodedAdmin = true;
       } else if (username.includes('@')) {
         email = username;
-      } else if (username === 'mrhandsome81091') {
+      } else if (username.toLowerCase() === 'mrhandsome81091') {
         email = 'mrhandsome81091@gmail.com';
       } else {
         throw new Error('Invalid admin credentials');
@@ -93,7 +89,7 @@ export default function AdminLogin() {
         firebaseUser = userCredential.user;
       } catch (err: any) {
         // If user not found and it's an allowed admin email, try to create it
-        const isAdminEmail = email === 'admin@tutorflow.com' || email === 'mrhandsome81091@gmail.com';
+        const isAdminEmail = email.toLowerCase() === 'admin@tutorflow.com' || email.toLowerCase() === 'mrhandsome81091@gmail.com';
         if ((err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') && isAdminEmail) {
           const userCredential = await createUserWithEmailAndPassword(auth, email, password);
           firebaseUser = userCredential.user;
@@ -103,7 +99,7 @@ export default function AdminLogin() {
       }
 
       // 2. Check if this user is allowed to be an admin
-      const isAdminEmail = firebaseUser.email === 'admin@tutorflow.com' || firebaseUser.email === 'mrhandsome81091@gmail.com';
+      const isAdminEmail = firebaseUser.email?.toLowerCase() === 'admin@tutorflow.com' || firebaseUser.email?.toLowerCase() === 'mrhandsome81091@gmail.com';
       
       if (!isAdminEmail) {
         throw new Error('This account does not have administrator privileges.');

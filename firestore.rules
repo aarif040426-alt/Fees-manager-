@@ -50,15 +50,18 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && 
         (request.auth.uid == userId || 
-         request.auth.token.email.lower().split('@')[0] == userId.lower());
+         (request.auth.token.get('email', '').lower().split('@')[0] == userId.lower()));
     }
 
     function isAdmin() {
       return isAuthenticated() &&
-        (request.auth.token.email.lower() == "mrhandsome81091@gmail.com" ||
-         request.auth.token.email.lower() == "admin@tutorflow.com" ||
-         (exists(/databases/$(database)/documents/teachers/$(request.auth.token.email.lower().split('@')[0])) && 
-          get(/databases/$(database)/documents/teachers/$(request.auth.token.email.lower().split('@')[0])).data.role == 'admin'));
+        (request.auth.token.get('email', '').lower() == "mrhandsome81091@gmail.com" ||
+         request.auth.token.get('email', '').lower() == "admin@tutorflow.com" ||
+         (exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'admin') ||
+         (request.auth.token.get('email', '').lower().split('@')[0] != "" && 
+          exists(/databases/$(database)/documents/teachers/$(request.auth.token.get('email', '').lower().split('@')[0])) && 
+          get(/databases/$(database)/documents/teachers/$(request.auth.token.get('email', '').lower().split('@')[0])).data.role == 'admin'));
     }
 
     function hasRequiredFields(fields) {
@@ -92,6 +95,12 @@ service cloud.firestore {
              (data.get('theme', null) == null || data.theme in ['light', 'dark', 'blue', 'purple']) &&
              (data.get('photoUrl', null) == null || data.photoUrl is string) &&
              (data.get('planStartDate', null) == null || data.planStartDate is string) &&
+             (data.get('notifications', null) == null || (
+               data.notifications is map &&
+               (data.notifications.get('email', null) == null || data.notifications.email is bool) &&
+               (data.notifications.get('whatsapp', null) == null || data.notifications.whatsapp is bool) &&
+               (data.notifications.get('paymentReminders', null) == null || data.notifications.paymentReminders is bool)
+             )) &&
              (data.get('createdAt', null) == null || data.createdAt is string);
     }
 
@@ -123,9 +132,27 @@ service cloud.firestore {
              (data.get('updatedAt', null) == null || data.updatedAt is timestamp);
     }
 
+    function isValidPlanRequest(data) {
+      return hasRequiredFields(['teacherId', 'requestedPlan', 'status', 'createdAt']) &&
+             isOwner(data.teacherId) &&
+             data.requestedPlan in ['Free', 'Pro', 'Enterprise'] &&
+             data.status in ['Pending', 'Approved', 'Rejected'] &&
+             (data.get('teacherName', null) == null || data.teacherName is string) &&
+             (data.get('teacherEmail', null) == null || data.teacherEmail is string) &&
+             (data.get('currentPlan', null) == null || data.currentPlan in ['Free', 'Pro', 'Enterprise']) &&
+             data.createdAt is string;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
+
+    match /planRequests/{requestId} {
+      allow read: if isAuthenticated() && (isOwner(resource.data.teacherId) || isAdmin());
+      allow create: if isAuthenticated() && isValidPlanRequest(request.resource.data);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
 
     match /teachers/{teacherId} {
       allow read: if isOwner(teacherId) || isAdmin();

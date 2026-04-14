@@ -100,7 +100,8 @@ const StudentModal = ({
   };
 
   const uploadPhoto = async (file: File, studentId: string): Promise<string> => {
-    const storageRef = ref(storage, `students/${studentId}/${file.name}`);
+    const extension = file.name.split('.').pop();
+    const storageRef = ref(storage, `students/${studentId}/profile.${extension}`);
     await uploadBytes(storageRef, file);
     return await getDownloadURL(storageRef);
   };

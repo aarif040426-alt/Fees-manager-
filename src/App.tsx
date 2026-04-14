@@ -12,7 +12,7 @@ import Admin from './pages/Admin';
 import AdminLogin from './pages/AdminLogin';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean }> = ({ children, adminOnly }) => {
-  const { user, teacher, loading } = useAuth();
+  const { user, teacher, loading, isRealAdmin } = useAuth();
 
   if (loading) {
     return (
@@ -26,7 +26,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode; adminOnly?: boolean 
     return <Navigate to={adminOnly ? "/admin/login" : "/"} />;
   }
 
-  if (adminOnly && teacher?.role !== 'admin') {
+  if (adminOnly && !isRealAdmin) {
     return <Navigate to="/" />;
   }
 

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db, auth } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { Teacher, Theme } from '../types';
 
@@ -9,6 +9,7 @@ interface AuthContextType {
   teacher: Teacher | null;
   loading: boolean;
   isAuthReady: boolean;
+  isRealAdmin: boolean;
   setTheme: (theme: Theme) => void;
   login: (uid: string, teacher: Teacher) => void;
   logout: () => void;
@@ -21,6 +22,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [teacher, setTeacher] = useState<Teacher | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isRealAdmin, setIsRealAdmin] = useState(false);
 
   const applyTheme = (theme: Theme) => {
     const root = window.document.documentElement;
@@ -42,10 +44,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     auth.signOut();
     setUser(null);
     setTeacher(null);
+    setIsRealAdmin(false);
     applyTheme('light');
   };
 
   useEffect(() => {
+    // Set persistence to session (logout on tab close)
+    setPersistence(auth, browserSessionPersistence).catch(err => {
+      console.error("Error setting persistence:", err);
+    });
+
     // Safety timeout for loading state
     const loadingTimeout = setTimeout(() => {
       if (loading) {
@@ -58,19 +66,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         try {
-          // Check for impersonation (only allowed for admins)
-          const impersonatedUid = sessionStorage.getItem('impersonatedTeacherUid');
-          const realTeacherUid = firebaseUser.email?.split('@')[0] || firebaseUser.uid;
+          const teacherUid = firebaseUser.email?.split('@')[0] || firebaseUser.uid;
           
           // Special case for hardcoded Admin and User Email
-          const isAdminEmail = firebaseUser.email === 'admin@tutorflow.com' || firebaseUser.email === 'mrhandsome81091@gmail.com';
+          const isAdminEmail = firebaseUser.email?.toLowerCase() === 'admin@tutorflow.com' || firebaseUser.email?.toLowerCase() === 'mrhandsome81091@gmail.com';
           
-          const teacherUid = (isAdminEmail && impersonatedUid) ? impersonatedUid : realTeacherUid;
+          setIsRealAdmin(isAdminEmail);
 
-          if (isAdminEmail && !impersonatedUid) {
-            const adminData: Teacher = {
+          let currentTeacher: Teacher | null = null;
+
+          if (isAdminEmail) {
+            currentTeacher = {
               uid: teacherUid,
-              name: firebaseUser.displayName || (firebaseUser.email === 'admin@tutorflow.com' ? 'Administrator' : 'Admin User'),
+              name: firebaseUser.displayName || (firebaseUser.email?.toLowerCase() === 'admin@tutorflow.com' ? 'Administrator' : 'Admin User'),
               email: firebaseUser.email || '',
               role: 'admin',
               plan: 'Enterprise',
@@ -83,29 +91,37 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               },
               createdAt: new Date().toISOString(),
             };
-            setTeacher(adminData);
-            setUser({ uid: teacherUid, email: adminData.email, displayName: adminData.name });
+            setTeacher(currentTeacher);
+            setUser({ uid: teacherUid, email: currentTeacher.email, displayName: currentTeacher.name });
             applyTheme('dark');
           }
 
-          const teacherRef = doc(db, 'teachers', teacherUid);
-          const teacherSnap = await getDoc(teacherRef);
-          
-          if (teacherSnap.exists()) {
-            const data = teacherSnap.data() as Teacher;
-            // If impersonating, we keep the admin role for the current session's logic if needed, 
-            // but the data will be the teacher's data.
-            // Actually, we should probably merge them or just use the teacher data.
-            setTeacher(data);
-            setUser({ uid: teacherUid, email: data.email || '', displayName: data.name || '' });
-            if (data.theme) applyTheme(data.theme);
-          } else if (!isAdminEmail) {
-            console.log("Teacher profile not found in Firestore for:", teacherUid);
-            setUser({ uid: teacherUid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
+          try {
+            const teacherRef = doc(db, 'teachers', teacherUid);
+            const teacherSnap = await getDoc(teacherRef);
+            
+            if (teacherSnap.exists()) {
+              const data = teacherSnap.data() as Teacher;
+              // Ensure admin emails always have admin role
+              if (isAdminEmail && data.role !== 'admin') {
+                data.role = 'admin';
+              }
+              setTeacher(data);
+              setUser({ uid: teacherUid, email: data.email || '', displayName: data.name || '' });
+              if (data.theme) applyTheme(data.theme);
+            } else if (!isAdminEmail) {
+              console.log("Teacher profile not found in Firestore for:", teacherUid);
+              setUser({ uid: teacherUid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
+            }
+          } catch (error) {
+            console.error("Error fetching teacher profile:", error);
+            // If it's an admin email, we already set the basic admin profile, so we're okay
+            if (!isAdminEmail) {
+              setUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
+            }
           }
         } catch (error) {
           console.error("Error initializing teacher profile:", error);
-          // Still set the basic user info so the app can at least try to load
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
         }
       } else {
@@ -124,7 +140,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, teacher, loading, isAuthReady, setTheme, login, logout }}>
+    <AuthContext.Provider value={{ user, teacher, loading, isAuthReady, isRealAdmin, setTheme, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

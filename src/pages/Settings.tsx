@@ -17,6 +17,7 @@ import {
   Smartphone,
   Globe,
   Zap,
+  RefreshCw,
   Crown,
   Star,
   Calendar,
@@ -24,7 +25,7 @@ import {
   Eye,
   EyeOff
 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, query, collection, where, onSnapshot, setDoc } from 'firebase/firestore';
 import { updatePassword } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { db, handleFirestoreError, OperationType, logout, auth, storage } from '../lib/firebase';
@@ -72,6 +73,8 @@ export default function Settings() {
     type: 'info'
   });
 
+  const [pendingRequest, setPendingRequest] = useState<string | null>(null);
+
   useEffect(() => {
     if (teacher) {
       setFormData({
@@ -90,6 +93,27 @@ export default function Settings() {
     }
   }, [teacher]);
 
+  useEffect(() => {
+    if (!teacher) return;
+    
+    // Check for existing pending requests
+    const q = query(
+      collection(db, 'planRequests'),
+      where('teacherId', '==', teacher.uid),
+      where('status', '==', 'Pending')
+    );
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (!snapshot.empty) {
+        setPendingRequest(snapshot.docs[0].data().requestedPlan);
+      } else {
+        setPendingRequest(null);
+      }
+    });
+    
+    return () => unsubscribe();
+  }, [teacher]);
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -103,7 +127,8 @@ export default function Settings() {
   };
 
   const uploadPhoto = async (file: File, teacherUid: string): Promise<string> => {
-    const storageRef = ref(storage, `teachers/${teacherUid}/${file.name}`);
+    const extension = file.name.split('.').pop();
+    const storageRef = ref(storage, `teachers/${teacherUid}/profile.${extension}`);
     await uploadBytes(storageRef, file);
     return await getDownloadURL(storageRef);
   };
@@ -132,20 +157,38 @@ export default function Settings() {
 
   const handleUpgradePlan = async (planId: SubscriptionPlan) => {
     if (!teacher) return;
-    setUpgradeLoading(planId);
-    try {
-      await updateDoc(doc(db, 'teachers', teacher.uid), {
-        plan: planId,
-        planStartDate: new Date().toISOString()
-      });
+    if (pendingRequest) {
       setAlertData({
         isOpen: true,
-        title: 'Plan Upgraded!',
-        message: `Congratulations! You have successfully upgraded to the ${planId} plan.`,
+        title: 'Request Already Pending',
+        message: `You already have a pending request for the ${pendingRequest} plan. Please wait for admin approval.`,
+        type: 'warning'
+      });
+      return;
+    }
+
+    setUpgradeLoading(planId);
+    try {
+      const requestRef = doc(collection(db, 'planRequests'));
+      await setDoc(requestRef, {
+        id: requestRef.id,
+        teacherId: teacher.uid,
+        teacherName: teacher.name || 'Unknown Teacher',
+        teacherEmail: teacher.email || '',
+        currentPlan: teacher.plan,
+        requestedPlan: planId,
+        status: 'Pending',
+        createdAt: new Date().toISOString()
+      });
+
+      setAlertData({
+        isOpen: true,
+        title: 'Request Sent!',
+        message: `Your request to upgrade to the ${planId} plan has been sent to the admin. You will be notified once it is approved.`,
         type: 'success'
       });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, 'teachers');
+      handleFirestoreError(err, OperationType.WRITE, 'planRequests');
     } finally {
       setUpgradeLoading(null);
     }
@@ -156,9 +199,21 @@ export default function Settings() {
     navigate('/');
   };
 
-  const handleThemeChange = (newTheme: Theme) => {
+  const handleThemeChange = async (newTheme: Theme) => {
     setFormData(prev => ({ ...prev, theme: newTheme }));
     setTheme(newTheme);
+    
+    // Save theme immediately to Firestore
+    if (teacher) {
+      try {
+        await updateDoc(doc(db, 'teachers', teacher.uid), {
+          theme: newTheme
+        });
+      } catch (err) {
+        console.error("Error saving theme preference:", err);
+        handleFirestoreError(err, OperationType.UPDATE, 'teachers');
+      }
+    }
   };
 
   const toggleNotification = (key: keyof typeof formData.notifications) => {
@@ -551,11 +606,13 @@ export default function Settings() {
                           ))}
                         </ul>
                         <button
-                          disabled={teacher?.plan === plan.id || upgradeLoading !== null}
+                          disabled={teacher?.plan === plan.id || upgradeLoading !== null || pendingRequest === plan.id}
                           onClick={() => handleUpgradePlan(plan.id as SubscriptionPlan)}
                           className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
                             teacher?.plan === plan.id
                               ? "bg-emerald-100 text-emerald-700 cursor-default"
+                              : pendingRequest === plan.id
+                              ? "bg-amber-100 text-amber-700 cursor-default"
                               : "bg-slate-900 text-white hover:bg-slate-800"
                           }`}
                         >
@@ -566,10 +623,15 @@ export default function Settings() {
                               <Check size={18} />
                               Current Plan
                             </>
+                          ) : pendingRequest === plan.id ? (
+                            <>
+                              <RefreshCw size={18} className="animate-spin" />
+                              Request Pending
+                            </>
                           ) : (
                             <>
                               <Zap size={18} />
-                              Upgrade to {plan.label}
+                              Request {plan.label}
                             </>
                           )}
                         </button>

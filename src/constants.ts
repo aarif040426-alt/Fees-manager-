@@ -12,7 +12,7 @@ export interface PlanLimit {
 
 export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimit> = {
   Free: {
-    maxStudents: 10,
+    maxStudents: 1,
     features: {
       whatsappNotifications: false,
       advancedReports: false,
@@ -21,7 +21,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimit> = {
     },
   },
   Pro: {
-    maxStudents: 50,
+    maxStudents: 5,
     features: {
       whatsappNotifications: true,
       advancedReports: true,
@@ -30,7 +30,7 @@ export const PLAN_LIMITS: Record<SubscriptionPlan, PlanLimit> = {
     },
   },
   Enterprise: {
-    maxStudents: Infinity,
+    maxStudents: 10,
     features: {
       whatsappNotifications: true,
       advancedReports: true,

@@ -9,9 +9,22 @@
         "name": { "type": "string" },
         "email": { "type": "string" },
         "mobile": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "teacher"] }
+        "role": { "type": "string", "enum": ["admin", "teacher"] },
+        "plan": { "type": "string", "enum": ["Free", "Pro", "Enterprise"] },
+        "planStartDate": { "type": "string", "format": "date-time" },
+        "theme": { "type": "string", "enum": ["light", "dark", "blue", "purple"] },
+        "photoUrl": { "type": "string" },
+        "notifications": {
+          "type": "object",
+          "properties": {
+            "email": { "type": "boolean" },
+            "whatsapp": { "type": "boolean" },
+            "paymentReminders": { "type": "boolean" }
+          }
+        },
+        "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["uid", "email"]
+      "required": ["uid", "email", "role", "plan", "theme"]
     },
     "Student": {
       "title": "Student",
@@ -25,7 +38,8 @@
         "board": { "type": "string", "enum": ["SSC", "ICSE", "CBSE", "Other"] },
         "standard": { "type": "string" },
         "feeAmount": { "type": "number" },
-        "joiningDate": { "type": "string", "format": "date" }
+        "joiningDate": { "type": "string", "format": "date" },
+        "photoUrl": { "type": "string" }
       },
       "required": ["teacherId", "name", "feeAmount"]
     },
@@ -43,6 +57,21 @@
         "paidAt": { "type": "string", "format": "date-time" }
       },
       "required": ["teacherId", "studentId", "month", "status"]
+    },
+    "PlanRequest": {
+      "title": "PlanRequest",
+      "description": "A request for a plan upgrade.",
+      "type": "object",
+      "properties": {
+        "teacherId": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "teacherEmail": { "type": "string" },
+        "currentPlan": { "type": "string", "enum": ["Free", "Pro", "Enterprise"] },
+        "requestedPlan": { "type": "string", "enum": ["Free", "Pro", "Enterprise"] },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["teacherId", "requestedPlan", "status", "createdAt"]
     }
   },
   "firestore": {
@@ -57,6 +86,10 @@
     "/payments/{paymentId}": {
       "schema": "Payment",
       "description": "Payment history"
+    },
+    "/planRequests/{requestId}": {
+      "schema": "PlanRequest",
+      "description": "Requests for plan upgrades"
     }
   }
 }

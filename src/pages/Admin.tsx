@@ -16,19 +16,19 @@ import {
   ArrowRight,
   RefreshCw,
   ChevronLeft,
-  Eye,
-  EyeOff,
   Trash2,
   Download,
-  Key
+  Key,
+  Zap
 } from 'lucide-react';
-import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc } from 'firebase/firestore';
+import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc, where, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { Teacher, SubscriptionPlan } from '../types';
+import { Teacher, SubscriptionPlan, PlanRequest } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
+import { ConfirmModal } from '../components/UIModals';
 
 export default function Admin() {
   const { user, teacher, logout, loading: authLoading } = useAuth();
@@ -39,12 +39,21 @@ export default function Admin() {
   });
 
   const [teachers, setTeachers] = useState<Teacher[]>([]);
+  const [planRequests, setPlanRequests] = useState<PlanRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [requestsLoading, setRequestsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null);
+  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
+  const [activeTab, setActiveTab] = useState<'teachers' | 'requests'>('teachers');
+  const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; teacherId: string; teacherName: string }>({
+    isOpen: false,
+    teacherId: '',
+    teacherName: ''
+  });
 
   useEffect(() => {
     if (teacher?.role === 'admin' && !isAuthenticated) {
@@ -109,6 +118,24 @@ export default function Admin() {
     }
   };
 
+  const fetchPlanRequests = () => {
+    setRequestsLoading(true);
+    const q = query(
+      collection(db, 'planRequests'),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setPlanRequests(snapshot.docs.map(doc => ({ ...doc.data() } as PlanRequest)));
+      setRequestsLoading(false);
+    }, (err) => {
+      console.error("Error fetching plan requests:", err);
+      setRequestsLoading(false);
+    });
+
+    return unsubscribe;
+  };
+
   useEffect(() => {
     setDebugInfo(prev => prev + `\n- Auth State: user=${!!user}, teacher=${!!teacher}, role=${teacher?.role}, authLoading=${authLoading}`);
     if (teacher?.role === 'admin' && !isAuthenticated) {
@@ -120,9 +147,12 @@ export default function Admin() {
   useEffect(() => {
     if (!isAuthenticated || authLoading) return;
     
-    const unsubscribe = fetchTeachers();
+    const unsubTeachers = fetchTeachers();
+    const unsubRequests = fetchPlanRequests();
+    
     return () => {
-      if (typeof unsubscribe === 'function') unsubscribe();
+      if (typeof unsubTeachers === 'function') unsubTeachers();
+      if (typeof unsubRequests === 'function') unsubRequests();
     };
   }, [isAuthenticated, authLoading]);
 
@@ -140,23 +170,36 @@ export default function Admin() {
     }
   };
 
-  const handleDeleteTeacher = async (teacherId: string, teacherName: string) => {
-    if (!window.confirm(`Are you sure you want to delete teacher "${teacherName}"? This will NOT delete their Firebase Auth account, only their Firestore profile and data access.`)) {
-      return;
-    }
+  const handleProcessRequest = async (request: PlanRequest, status: 'Approved' | 'Rejected') => {
+    setProcessingRequestId(request.id);
+    try {
+      // 1. Update the request status
+      await updateDoc(doc(db, 'planRequests', request.id), {
+        status,
+        updatedAt: new Date().toISOString()
+      });
 
+      // 2. If approved, update the teacher's plan
+      if (status === 'Approved') {
+        await updateDoc(doc(db, 'teachers', request.teacherId), {
+          plan: request.requestedPlan,
+          planStartDate: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, 'planRequests');
+    } finally {
+      setProcessingRequestId(null);
+    }
+  };
+
+  const handleDeleteTeacher = async (teacherId: string) => {
     try {
       await deleteDoc(doc(db, 'teachers', teacherId));
       setTeachers(prev => prev.filter(t => t.uid !== teacherId));
     } catch (err) {
       handleFirestoreError(err, OperationType.DELETE, 'teachers');
     }
-  };
-
-  const handleImpersonate = (teacherUid: string) => {
-    sessionStorage.setItem('impersonatedTeacherUid', teacherUid);
-    navigate('/dashboard');
-    window.location.reload(); // Force reload to pick up new UID
   };
 
   const handleExportData = () => {
@@ -278,6 +321,35 @@ export default function Admin() {
           </div>
         </div>
 
+        {/* Tabs */}
+        <div className="flex items-center gap-4 border-b border-slate-200">
+          <button
+            onClick={() => setActiveTab('teachers')}
+            className={`px-6 py-4 font-bold text-sm transition-all border-b-2 ${
+              activeTab === 'teachers' 
+                ? "border-blue-600 text-blue-600" 
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Teachers List
+          </button>
+          <button
+            onClick={() => setActiveTab('requests')}
+            className={`px-6 py-4 font-bold text-sm transition-all border-b-2 relative ${
+              activeTab === 'requests' 
+                ? "border-blue-600 text-blue-600" 
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Plan Requests
+            {planRequests.filter(r => r.status === 'Pending').length > 0 && (
+              <span className="absolute top-3 right-1 w-5 h-5 bg-red-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">
+                {planRequests.filter(r => r.status === 'Pending').length}
+              </span>
+            )}
+          </button>
+        </div>
+
         {debugInfo && (loading || firestoreError) && (
           <div className="bg-slate-900/5 border border-slate-200 p-4 rounded-2xl font-mono text-[10px] text-slate-500 overflow-auto max-h-32">
             <p className="font-bold mb-1 uppercase tracking-widest text-[9px]">Diagnostic Log:</p>
@@ -318,7 +390,7 @@ export default function Admin() {
           </div>
         )}
 
-        {!loading && !firestoreError && teachers.length === 0 && (
+        {!loading && !firestoreError && activeTab === 'teachers' && teachers.length === 0 && (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-3xl flex items-center justify-center">
               <Users size={32} />
@@ -330,7 +402,7 @@ export default function Admin() {
           </div>
         )}
 
-        {!loading && !firestoreError && teachers.length > 0 && (
+        {!loading && !firestoreError && activeTab === 'teachers' && teachers.length > 0 && (
           <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
@@ -373,8 +445,12 @@ export default function Admin() {
                     >
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 font-bold">
-                            {teacher.name?.[0] || 'T'}
+                          <div className="w-10 h-10 rounded-xl bg-blue-50 border border-slate-100 overflow-hidden flex items-center justify-center text-blue-600 font-bold shadow-inner">
+                            {teacher.photoUrl ? (
+                              <img src={teacher.photoUrl} alt={teacher.name || 'Teacher'} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                            ) : (
+                              teacher.name?.[0] || 'T'
+                            )}
                           </div>
                           <div>
                             <p className="font-bold text-slate-800">{teacher.name || 'N/A'}</p>
@@ -406,13 +482,6 @@ export default function Admin() {
                       </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => handleImpersonate(teacher.uid)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                            title="View as Teacher"
-                          >
-                            <Eye size={18} />
-                          </button>
                           <select
                             value={teacher.plan || 'Free'}
                             disabled={updatingPlan === teacher.uid}
@@ -427,7 +496,7 @@ export default function Admin() {
                             <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin" />
                           )}
                           <button
-                            onClick={() => handleDeleteTeacher(teacher.uid, teacher.name || 'N/A')}
+                            onClick={() => setDeleteConfirm({ isOpen: true, teacherId: teacher.uid, teacherName: teacher.name || 'N/A' })}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                             title="Delete Teacher"
                           >
@@ -443,7 +512,117 @@ export default function Admin() {
           </div>
         </div>
         )}
+
+        {/* Plan Requests Tab */}
+        {activeTab === 'requests' && (
+          <div className="space-y-6">
+            {requestsLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4">
+                <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+                <p className="text-slate-500 font-medium">Loading requests...</p>
+              </div>
+            ) : planRequests.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4 bg-white rounded-3xl border border-slate-200">
+                <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-3xl flex items-center justify-center">
+                  <Zap size={32} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-bold text-slate-900">No Plan Requests</h3>
+                  <p className="text-slate-500 text-sm">There are no pending or past plan upgrade requests.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Teacher</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Plan</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Requested Plan</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {planRequests.map((request) => (
+                        <tr key={request.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="font-bold text-slate-800">{request.teacherName}</p>
+                              <p className="text-xs text-slate-500">{request.teacherEmail}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-medium text-slate-600">{request.currentPlan}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-lg text-xs font-bold uppercase tracking-wider border border-blue-200">
+                              {request.requestedPlan}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-slate-500">{format(new Date(request.createdAt), 'dd MMM, HH:mm')}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border ${
+                              request.status === 'Approved' 
+                                ? "bg-emerald-100 text-emerald-700 border-emerald-200" 
+                                : request.status === 'Rejected'
+                                ? "bg-red-100 text-red-700 border-red-200"
+                                : "bg-amber-100 text-amber-700 border-amber-200"
+                            }`}>
+                              {request.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {request.status === 'Pending' && (
+                              <div className="flex items-center justify-end gap-2">
+                                <button
+                                  onClick={() => handleProcessRequest(request, 'Approved')}
+                                  disabled={processingRequestId === request.id}
+                                  className="px-3 py-1.5 bg-emerald-600 text-white text-xs font-bold rounded-lg hover:bg-emerald-700 transition-all disabled:opacity-50"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  onClick={() => handleProcessRequest(request, 'Rejected')}
+                                  disabled={processingRequestId === request.id}
+                                  className="px-3 py-1.5 bg-red-600 text-white text-xs font-bold rounded-lg hover:bg-red-700 transition-all disabled:opacity-50"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            )}
+                            {processingRequestId === request.id && (
+                              <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin ml-auto" />
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      <AnimatePresence>
+        {deleteConfirm.isOpen && (
+          <ConfirmModal
+            isOpen={deleteConfirm.isOpen}
+            onClose={() => setDeleteConfirm({ ...deleteConfirm, isOpen: false })}
+            onConfirm={() => handleDeleteTeacher(deleteConfirm.teacherId)}
+            title="Delete Teacher"
+            message={`Are you sure you want to delete teacher "${deleteConfirm.teacherName}"? This will NOT delete their Firebase Auth account, only their Firestore profile and data access.`}
+            confirmLabel="Delete"
+            isDestructive
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Teacher } from '../types';
 
 export default function Login() {
-  const { user, teacher, loading, login } = useAuth();
+  const { user, teacher, loading, login, isRealAdmin } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -27,13 +27,6 @@ export default function Login() {
     );
   }
 
-  if (user) {
-    if (teacher?.role === 'admin') {
-      return <Navigate to="/admin" />;
-    }
-    return <Navigate to="/dashboard" />;
-  }
-
   const handleForgotPassword = async () => {
     if (!username) {
       setError('Please enter your email or username first.');
@@ -46,7 +39,7 @@ export default function Login() {
 
     let email = username;
     if (!username.includes('@')) {
-      if (username === 'Admin') {
+      if (username.toLowerCase() === 'admin') {
         email = 'admin@tutorflow.com';
       } else if (username.toLowerCase() === 'mrhandsome81091') {
         email = 'mrhandsome81091@gmail.com';
@@ -81,7 +74,7 @@ export default function Login() {
     let isHardcodedAdmin = false;
 
     if (!username.includes('@')) {
-      if (username === 'Admin' && password === 'Aayat@250522') {
+      if (username.toLowerCase() === 'admin' && password === 'Aayat@250522') {
         email = 'admin@tutorflow.com';
         teacherUid = 'admin';
         isHardcodedAdmin = true;
@@ -102,7 +95,7 @@ export default function Login() {
         const firebaseUser = userCredential.user;
         
         // Special case for admins
-        const isAdminEmail = firebaseUser.email === 'admin@tutorflow.com' || firebaseUser.email === 'mrhandsome81091@gmail.com';
+        const isAdminEmail = firebaseUser.email?.toLowerCase() === 'admin@tutorflow.com' || firebaseUser.email?.toLowerCase() === 'mrhandsome81091@gmail.com';
         
         const teacherRef = doc(db, 'teachers', teacherUid);
         const teacherSnap = await getDoc(teacherRef);
@@ -123,7 +116,7 @@ export default function Login() {
             sessionStorage.setItem('isAdminAuthenticated', 'true');
             navigate('/admin');
           } else {
-            navigate('/');
+            navigate('/dashboard');
           }
         } else if (isAdminEmail) {
           // Admin might not have a record yet
@@ -153,7 +146,7 @@ export default function Login() {
         if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
           // 2. Create new Teacher account if not found
           // For admin emails, we allow creation if it's the first time
-          const isAdminEmail = email === 'admin@tutorflow.com' || email === 'mrhandsome81091@gmail.com';
+          const isAdminEmail = email.toLowerCase() === 'admin@tutorflow.com' || email.toLowerCase() === 'mrhandsome81091@gmail.com';
 
           try {
             await createUserWithEmailAndPassword(auth, email, password);
