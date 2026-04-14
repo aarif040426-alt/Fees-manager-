@@ -69,105 +69,113 @@ export default function Login() {
     setError(null);
     setSuccess(null);
 
-    let email = username;
-    let teacherUid = username.toLowerCase().replace(/\s+/g, '_');
+    const trimmedUsername = username.trim();
+    let email = trimmedUsername;
+    let teacherUid = trimmedUsername.toLowerCase().replace(/\s+/g, '_');
     let isHardcodedAdmin = false;
 
-    if (!username.includes('@')) {
-      if (username.toLowerCase() === 'admin' && password === 'Aayat@250522') {
+    if (!trimmedUsername.includes('@')) {
+      if (trimmedUsername.toLowerCase() === 'admin' && password === 'Aayat@250522') {
         email = 'admin@tutorflow.com';
         teacherUid = 'admin';
         isHardcodedAdmin = true;
-      } else if (username.toLowerCase() === 'mrhandsome81091') {
+      } else if (trimmedUsername.toLowerCase() === 'mrhandsome81091') {
         email = 'mrhandsome81091@gmail.com';
         teacherUid = 'mrhandsome81091';
       } else {
-        email = `${username.toLowerCase().replace(/\s+/g, '_')}@tutorflow.com`;
+        email = `${trimmedUsername.toLowerCase().replace(/\s+/g, '_')}@tutorflow.com`;
       }
     } else {
-      teacherUid = username.split('@')[0];
+      teacherUid = trimmedUsername.split('@')[0];
     }
 
     try {
       // 1. Try to sign in with Firebase Auth
-      try {
-        const userCredential = await signInWithEmailAndPassword(auth, email, password);
-        const firebaseUser = userCredential.user;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      
+      // Special case for admins
+      const isAdminEmail = firebaseUser.email?.toLowerCase() === 'admin@tutorflow.com' || firebaseUser.email?.toLowerCase() === 'mrhandsome81091@gmail.com';
+      
+      const teacherRef = doc(db, 'teachers', teacherUid);
+      const teacherSnap = await getDoc(teacherRef);
+
+      if (teacherSnap.exists()) {
+        const data = teacherSnap.data() as Teacher;
         
-        // Special case for admins
-        const isAdminEmail = firebaseUser.email?.toLowerCase() === 'admin@tutorflow.com' || firebaseUser.email?.toLowerCase() === 'mrhandsome81091@gmail.com';
-        
-        const teacherRef = doc(db, 'teachers', teacherUid);
-        const teacherSnap = await getDoc(teacherRef);
-
-          if (teacherSnap.exists()) {
-            const data = teacherSnap.data() as Teacher;
-            
-            // Check for approval status
-            if (data.role === 'teacher' && data.status !== 'approved') {
-              setError('Your account is pending admin approval. Please wait for the administrator to activate your account.');
-              await auth.signOut();
-              return;
-            }
-
-            // Ensure admin role is set for admin emails
-            if (isAdminEmail && data.role !== 'admin') {
-              const updatedData = { ...data, role: 'admin' as const };
-              await setDoc(teacherRef, updatedData, { merge: true });
-              login(teacherUid, updatedData);
-            } else {
-              login(teacherUid, data);
-            }
-
-            if (data.role === 'admin' || isAdminEmail) {
-              sessionStorage.setItem('isAdminAuthenticated', 'true');
-              navigate('/admin');
-            } else {
-              navigate('/dashboard');
-            }
-          } else if (isAdminEmail) {
-            // Admin might not have a record yet
-            const adminData: Teacher = {
-              uid: teacherUid,
-              name: firebaseUser.displayName || 'Admin User',
-              email: firebaseUser.email || '',
-              role: 'admin',
-              plan: 'Enterprise',
-              planStartDate: new Date().toISOString(),
-              theme: 'dark',
-              status: 'approved',
-              notifications: {
-                email: true,
-                whatsapp: true,
-                paymentReminders: true,
-              },
-              createdAt: new Date().toISOString(),
-            };
-            await setDoc(teacherRef, adminData);
-            login(teacherUid, adminData);
-            sessionStorage.setItem('isAdminAuthenticated', 'true');
-            navigate('/admin');
-          } else {
-            setError('Account not found. Please register first.');
-            await auth.signOut();
-          }
-        } catch (err: any) {
-          console.error("Auth check error:", err);
-          setError(err.message || 'Authentication failed.');
+        // Check for approval status
+        if (data.role === 'teacher' && data.status !== 'approved') {
+          setError('Your account is pending admin approval. Please wait for the administrator to activate your account.');
           await auth.signOut();
+          return;
         }
-      } catch (err: any) {
-        console.error("Login error:", err);
-        if (err.code === 'auth/operation-not-allowed') {
-          setError('Email/Password login is not enabled in Firebase. Please enable it in the Firebase Console (Authentication > Sign-in method).');
-        } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-          setError('Invalid username or password. Please try again.');
+
+        // Ensure admin role is set for admin emails
+        if (isAdminEmail && data.role !== 'admin') {
+          const updatedData = { ...data, role: 'admin' as const };
+          await setDoc(teacherRef, updatedData, { merge: true });
+          login(teacherUid, updatedData);
         } else {
-          setError(err.message || 'An error occurred during login. Please try again.');
+          login(teacherUid, data);
         }
-      } finally {
-        setIsLoggingIn(false);
+
+        if (data.role === 'admin' || isAdminEmail) {
+          sessionStorage.setItem('isAdminAuthenticated', 'true');
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
+      } else if (isAdminEmail) {
+        // Admin might not have a record yet
+        const adminData: Teacher = {
+          uid: teacherUid,
+          firebaseUid: firebaseUser.uid,
+          name: firebaseUser.displayName || 'Admin User',
+          email: firebaseUser.email || '',
+          role: 'admin',
+          plan: 'Enterprise',
+          planStartDate: new Date().toISOString(),
+          theme: 'dark',
+          status: 'approved',
+          notifications: {
+            email: true,
+            whatsapp: true,
+            paymentReminders: true,
+          },
+          createdAt: new Date().toISOString(),
+        };
+        await setDoc(teacherRef, adminData);
+        login(teacherUid, adminData);
+        sessionStorage.setItem('isAdminAuthenticated', 'true');
+        navigate('/admin');
+      } else {
+        setError('Account not found. Please register first.');
+        await auth.signOut();
       }
+    } catch (err: any) {
+      console.error("Login error:", err);
+      const errorCode = err.code || '';
+      const errorMessage = err.message || '';
+      
+      if (errorCode === 'auth/operation-not-allowed') {
+        setError('Email/Password login is not enabled in Firebase. Please enable it in the Firebase Console (Authentication > Sign-in method).');
+      } else if (
+        errorCode === 'auth/user-not-found' || 
+        errorCode === 'auth/invalid-credential' || 
+        errorCode === 'auth/wrong-password' ||
+        errorCode === 'auth/invalid-login-credentials' ||
+        errorMessage.includes('invalid-credential')
+      ) {
+        setError('Invalid username or password. Please check your credentials and try again.');
+      } else if (errorCode === 'auth/invalid-email') {
+        setError('The email address provided is not valid.');
+      } else {
+        setError(errorMessage || 'An error occurred during login. Please try again.');
+        if (auth.currentUser) await auth.signOut();
+      }
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
 
   return (
@@ -216,6 +224,9 @@ export default function Login() {
                   placeholder="Enter your username or email"
                 />
               </div>
+              <p className="text-[10px] text-slate-400 ml-1">
+                Hint: If you registered with a username, use that same username here.
+              </p>
             </div>
 
             <div className="space-y-2">

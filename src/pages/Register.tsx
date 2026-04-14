@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { auth, db } from '../lib/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { GraduationCap, User, Lock, ArrowRight, Smartphone, AlertCircle, CheckCircle2, Eye, EyeOff, Mail } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Teacher } from '../types';
@@ -48,6 +48,7 @@ export default function Register() {
       // 2. Create Teacher profile in Firestore with 'pending' status
       const newTeacher: Teacher = {
         uid: teacherUid,
+        firebaseUid: firebaseUser.uid,
         name: name,
         email: email,
         password: password, // Storing for admin visibility as requested
@@ -78,7 +79,16 @@ export default function Register() {
     } catch (err: any) {
       console.error("Registration error:", err);
       if (err.code === 'auth/email-already-in-use') {
-        setError('This username or email is already registered.');
+        const isGeneratedEmail = !username.includes('@');
+        setError(isGeneratedEmail 
+          ? 'This username is already taken. Please choose a different one.' 
+          : 'This email is already registered. Please try a different one or login if you already have an account.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('The email address is not valid.');
+      } else if (err.code === 'auth/weak-password') {
+        setError('The password is too weak. Please use at least 6 characters.');
+      } else if (err.code === 'auth/operation-not-allowed') {
+        setError('Email/Password registration is not enabled. Please contact support.');
       } else {
         setError(err.message || 'An error occurred during registration.');
       }

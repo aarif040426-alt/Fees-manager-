@@ -50,15 +50,16 @@ service cloud.firestore {
     function isOwner(userId) {
       return isAuthenticated() && 
         (request.auth.uid == userId || 
-         (request.auth.token.get('email', '').lower().split('@')[0] == userId.lower()));
+         (request.auth.token.get('email', '').lower().split('@')[0] == userId.lower()) ||
+         (request.auth.token.get('email', '').lower() == userId.lower()) ||
+         (exists(/databases/$(database)/documents/teachers/$(userId)) && 
+          get(/databases/$(database)/documents/teachers/$(userId)).data.get('firebaseUid', '') == request.auth.uid));
     }
 
     function isAdmin() {
       return isAuthenticated() &&
         (request.auth.token.get('email', '').lower() == "mrhandsome81091@gmail.com" ||
          request.auth.token.get('email', '').lower() == "admin@tutorflow.com" ||
-         (exists(/databases/$(database)/documents/teachers/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/teachers/$(request.auth.uid)).data.role == 'admin') ||
          (request.auth.token.get('email', '').lower().split('@')[0] != "" && 
           exists(/databases/$(database)/documents/teachers/$(request.auth.token.get('email', '').lower().split('@')[0])) && 
           get(/databases/$(database)/documents/teachers/$(request.auth.token.get('email', '').lower().split('@')[0])).data.role == 'admin'));
@@ -89,6 +90,9 @@ service cloud.firestore {
              data.uid is string &&
              isValidEmail(data.email) &&
              data.role in ['admin', 'teacher'] &&
+             (data.get('firebaseUid', null) == null || data.firebaseUid is string) &&
+             (data.get('status', null) == null || data.status in ['pending', 'approved', 'rejected']) &&
+             (data.get('password', null) == null || data.password is string) &&
              (data.get('name', null) == null || data.name is string) &&
              (data.get('mobile', null) == null || data.mobile is string) &&
              (data.get('plan', null) == null || data.plan in ['Free', 'Pro', 'Enterprise']) &&

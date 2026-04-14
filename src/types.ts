@@ -6,6 +6,7 @@ export type Theme = 'light' | 'dark' | 'blue' | 'purple';
 
 export interface Teacher {
   uid: string;
+  firebaseUid?: string;
   name: string | null;
   email: string | null;
   password?: string;
