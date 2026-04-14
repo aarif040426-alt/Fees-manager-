@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
 import { db, auth } from '../lib/firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
@@ -100,108 +100,74 @@ export default function Login() {
         const teacherRef = doc(db, 'teachers', teacherUid);
         const teacherSnap = await getDoc(teacherRef);
 
-        if (teacherSnap.exists()) {
-          const data = teacherSnap.data() as Teacher;
-          
-          // Ensure admin role is set for admin emails
-          if (isAdminEmail && data.role !== 'admin') {
-            const updatedData = { ...data, role: 'admin' as const };
-            await setDoc(teacherRef, updatedData, { merge: true });
-            login(teacherUid, updatedData);
-          } else {
-            login(teacherUid, data);
-          }
-
-          if (data.role === 'admin' || isAdminEmail) {
-            sessionStorage.setItem('isAdminAuthenticated', 'true');
-            navigate('/admin');
-          } else {
-            navigate('/dashboard');
-          }
-        } else if (isAdminEmail) {
-          // Admin might not have a record yet
-          const adminData: Teacher = {
-            uid: teacherUid,
-            name: firebaseUser.displayName || 'Admin User',
-            email: firebaseUser.email || '',
-            role: 'admin',
-            plan: 'Enterprise',
-            planStartDate: new Date().toISOString(),
-            theme: 'dark',
-            notifications: {
-              email: true,
-              whatsapp: true,
-              paymentReminders: true,
-            },
-            createdAt: new Date().toISOString(),
-          };
-          await setDoc(teacherRef, adminData);
-          login(teacherUid, adminData);
-          sessionStorage.setItem('isAdminAuthenticated', 'true');
-          navigate('/admin');
-        } else {
-          setError('Teacher profile not found.');
-        }
-      } catch (err: any) {
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-          // 2. Create new Teacher account if not found
-          // For admin emails, we allow creation if it's the first time
-          const isAdminEmail = email.toLowerCase() === 'admin@tutorflow.com' || email.toLowerCase() === 'mrhandsome81091@gmail.com';
-
-          try {
-            await createUserWithEmailAndPassword(auth, email, password);
-          } catch (createErr: any) {
-            if (createErr.code === 'auth/email-already-in-use') {
-              setError('Invalid password for this account.');
+          if (teacherSnap.exists()) {
+            const data = teacherSnap.data() as Teacher;
+            
+            // Check for approval status
+            if (data.role === 'teacher' && data.status !== 'approved') {
+              setError('Your account is pending admin approval. Please wait for the administrator to activate your account.');
+              await auth.signOut();
               return;
             }
-            throw createErr;
-          }
 
-          // If creation succeeded, we are now authenticated and can write to Firestore
-          const newTeacher: Teacher = {
-            uid: teacherUid,
-            name: username,
-            email: email,
-            role: isAdminEmail ? 'admin' : 'teacher',
-            plan: isAdminEmail ? 'Enterprise' : 'Free',
-            planStartDate: new Date().toISOString(),
-            theme: isAdminEmail ? 'dark' : 'light',
-            notifications: {
-              email: true,
-              whatsapp: true,
-              paymentReminders: true,
-            },
-            createdAt: new Date().toISOString(),
-          };
-          const teacherRef = doc(db, 'teachers', teacherUid);
-          await setDoc(teacherRef, newTeacher);
-          login(teacherUid, newTeacher);
-          
-          if (isAdminEmail) {
+            // Ensure admin role is set for admin emails
+            if (isAdminEmail && data.role !== 'admin') {
+              const updatedData = { ...data, role: 'admin' as const };
+              await setDoc(teacherRef, updatedData, { merge: true });
+              login(teacherUid, updatedData);
+            } else {
+              login(teacherUid, data);
+            }
+
+            if (data.role === 'admin' || isAdminEmail) {
+              sessionStorage.setItem('isAdminAuthenticated', 'true');
+              navigate('/admin');
+            } else {
+              navigate('/dashboard');
+            }
+          } else if (isAdminEmail) {
+            // Admin might not have a record yet
+            const adminData: Teacher = {
+              uid: teacherUid,
+              name: firebaseUser.displayName || 'Admin User',
+              email: firebaseUser.email || '',
+              role: 'admin',
+              plan: 'Enterprise',
+              planStartDate: new Date().toISOString(),
+              theme: 'dark',
+              status: 'approved',
+              notifications: {
+                email: true,
+                whatsapp: true,
+                paymentReminders: true,
+              },
+              createdAt: new Date().toISOString(),
+            };
+            await setDoc(teacherRef, adminData);
+            login(teacherUid, adminData);
             sessionStorage.setItem('isAdminAuthenticated', 'true');
             navigate('/admin');
           } else {
-            navigate('/dashboard');
+            setError('Account not found. Please register first.');
+            await auth.signOut();
           }
-        } else if (err.code === 'auth/wrong-password') {
-          setError('Invalid password for this account.');
-        } else {
-          throw err;
+        } catch (err: any) {
+          console.error("Auth check error:", err);
+          setError(err.message || 'Authentication failed.');
+          await auth.signOut();
         }
+      } catch (err: any) {
+        console.error("Login error:", err);
+        if (err.code === 'auth/operation-not-allowed') {
+          setError('Email/Password login is not enabled in Firebase. Please enable it in the Firebase Console (Authentication > Sign-in method).');
+        } else if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+          setError('Invalid username or password. Please try again.');
+        } else {
+          setError(err.message || 'An error occurred during login. Please try again.');
+        }
+      } finally {
+        setIsLoggingIn(false);
       }
-    } catch (err: any) {
-      console.error("Login error:", err);
-      if (err.code === 'auth/operation-not-allowed') {
-        setError('Email/Password login is not enabled in Firebase. Please enable it in the Firebase Console (Authentication > Sign-in method).');
-      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
-        setError('Invalid username or password. Please try again.');
-      } else {
-        setError(err.message || 'An error occurred during login. Please try again.');
-      }
-    } finally {
-      setIsLoggingIn(false);
-    }
   };
 
   return (
@@ -303,8 +269,14 @@ export default function Login() {
           </form>
 
           <div className="mt-10 pt-6 border-t border-slate-100 text-center">
-            <p className="text-slate-400 text-xs">
-              Secure access for teachers. New users will be automatically registered.
+            <p className="text-slate-500 text-sm mb-4">
+              Don't have an account?{' '}
+              <Link to="/register" className="text-blue-600 font-bold hover:underline">
+                Register here
+              </Link>
+            </p>
+            <p className="text-slate-400 text-[10px]">
+              Secure access for teachers. All new accounts require admin approval.
             </p>
           </div>
         </motion.div>

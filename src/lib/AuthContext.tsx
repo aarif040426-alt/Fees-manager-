@@ -102,6 +102,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             if (teacherSnap.exists()) {
               const data = teacherSnap.data() as Teacher;
+              
+              // Check for approval status
+              if (data.role === 'teacher' && data.status !== 'approved') {
+                console.warn("User account not approved:", teacherUid);
+                auth.signOut();
+                setUser(null);
+                setTeacher(null);
+                return;
+              }
+
               // Ensure admin emails always have admin role
               if (isAdminEmail && data.role !== 'admin') {
                 data.role = 'admin';

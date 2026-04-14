@@ -15,6 +15,7 @@ export interface Teacher {
   planStartDate: string;
   theme: Theme;
   photoUrl?: string;
+  status?: 'pending' | 'approved' | 'rejected';
   notifications: {
     email: boolean;
     whatsapp: boolean;

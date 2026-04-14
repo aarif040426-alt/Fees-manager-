@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Users, 
+  User,
   Search, 
   Filter, 
   CreditCard, 
@@ -19,10 +20,12 @@ import {
   Trash2,
   Download,
   Key,
-  Zap
+  Zap,
+  X
 } from 'lucide-react';
 import { collection, query, onSnapshot, doc, updateDoc, getDocs, deleteDoc, where, orderBy } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
+import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { Teacher, SubscriptionPlan, PlanRequest } from '../types';
@@ -48,7 +51,8 @@ export default function Admin() {
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
   const [debugInfo, setDebugInfo] = useState<string>('');
   const [isExporting, setIsExporting] = useState(false);
-  const [activeTab, setActiveTab] = useState<'teachers' | 'requests'>('teachers');
+  const [activeTab, setActiveTab] = useState<'teachers' | 'requests' | 'pending'>('teachers');
+  const [processingTeacherId, setProcessingTeacherId] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ isOpen: boolean; teacherId: string; teacherName: string }>({
     isOpen: false,
     teacherId: '',
@@ -193,6 +197,29 @@ export default function Admin() {
     }
   };
 
+  const handleProcessTeacher = async (teacherId: string, status: 'approved' | 'rejected') => {
+    setProcessingTeacherId(teacherId);
+    try {
+      await updateDoc(doc(db, 'teachers', teacherId), {
+        status,
+        updatedAt: new Date().toISOString()
+      });
+    } catch (err) {
+      handleFirestoreError(err, OperationType.UPDATE, 'teachers');
+    } finally {
+      setProcessingTeacherId(null);
+    }
+  };
+
+  const handleResetPassword = async (teacherEmail: string) => {
+    try {
+      await sendPasswordResetEmail(auth, teacherEmail);
+      alert(`Password reset email sent to ${teacherEmail}`);
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    }
+  };
+
   const handleDeleteTeacher = async (teacherId: string) => {
     try {
       await deleteDoc(doc(db, 'teachers', teacherId));
@@ -205,15 +232,17 @@ export default function Admin() {
   const handleExportData = () => {
     setIsExporting(true);
     try {
-      const headers = ['Name', 'Email', 'Plan', 'Joined Date', 'Plan Start Date'];
+      const headers = ['Name', 'Email', 'Mobile', 'Password', 'Plan', 'Joined Date', 'Status'];
       const csvContent = [
         headers.join(','),
         ...teachers.map(t => [
           `"${t.name || ''}"`,
           `"${t.email || ''}"`,
+          `"${t.mobile || ''}"`,
+          `"${t.password || ''}"`,
           `"${t.plan || 'Free'}"`,
           `"${t.createdAt ? format(new Date(t.createdAt), 'yyyy-MM-dd') : ''}"`,
-          `"${t.planStartDate ? format(new Date(t.planStartDate), 'yyyy-MM-dd') : ''}"`
+          `"${t.status || 'approved'}"`
         ].join(','))
       ].join('\n');
 
@@ -348,6 +377,21 @@ export default function Admin() {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setActiveTab('pending')}
+            className={`px-6 py-4 font-bold text-sm transition-all border-b-2 relative ${
+              activeTab === 'pending' 
+                ? "border-blue-600 text-blue-600" 
+                : "border-transparent text-slate-500 hover:text-slate-700"
+            }`}
+          >
+            Pending Teachers
+            {teachers.filter(t => t.role === 'teacher' && t.status === 'pending').length > 0 && (
+              <span className="absolute top-3 right-1 w-5 h-5 bg-orange-500 text-white text-[10px] flex items-center justify-center rounded-full border-2 border-white">
+                {teachers.filter(t => t.role === 'teacher' && t.status === 'pending').length}
+              </span>
+            )}
+          </button>
         </div>
 
         {debugInfo && (loading || firestoreError) && (
@@ -426,9 +470,11 @@ export default function Admin() {
               <thead>
                 <tr className="bg-slate-50/50">
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Teacher</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">User ID</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mobile</th>
+                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Password</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Joined Date</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Current Plan</th>
-                  <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Plan Start</th>
                   <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
@@ -459,6 +505,21 @@ export default function Admin() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
+                        <span className="text-sm font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{teacher.uid}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Smartphone size={14} />
+                          <span className="text-sm font-medium">{teacher.mobile || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-slate-600">
+                          <Key size={14} />
+                          <span className="text-sm font-mono bg-slate-100 px-2 py-0.5 rounded">{teacher.password || 'N/A'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
                         <div className="flex items-center gap-2 text-slate-600">
                           <Calendar size={14} />
                           <span className="text-sm">{teacher.createdAt ? format(new Date(teacher.createdAt), 'dd MMM yyyy') : 'N/A'}</span>
@@ -475,13 +536,15 @@ export default function Admin() {
                           {teacher.plan || 'Free'}
                         </span>
                       </td>
-                      <td className="px-6 py-4">
-                        <span className="text-sm text-slate-500">
-                          {teacher.planStartDate ? format(new Date(teacher.planStartDate), 'dd MMM yyyy') : 'N/A'}
-                        </span>
-                      </td>
                       <td className="px-6 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleResetPassword(teacher.email || '')}
+                            className="p-2 text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
+                            title="Send Reset Email"
+                          >
+                            <RefreshCw size={18} />
+                          </button>
                           <select
                             value={teacher.plan || 'Free'}
                             disabled={updatingPlan === teacher.uid}
@@ -598,6 +661,84 @@ export default function Admin() {
                             {processingRequestId === request.id && (
                               <div className="w-4 h-4 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin ml-auto" />
                             )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Pending Teachers Tab */}
+        {activeTab === 'pending' && (
+          <div className="space-y-6">
+            {teachers.filter(t => t.role === 'teacher' && t.status === 'pending').length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 gap-4 bg-white rounded-3xl border border-slate-200">
+                <div className="w-16 h-16 bg-slate-100 text-slate-400 rounded-3xl flex items-center justify-center">
+                  <User size={32} />
+                </div>
+                <div className="text-center">
+                  <h3 className="text-lg font-bold text-slate-900">No Pending Approvals</h3>
+                  <p className="text-slate-500 text-sm">All teacher registration requests have been processed.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Teacher</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">User ID</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Mobile</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Password</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                        <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {teachers.filter(t => t.role === 'teacher' && t.status === 'pending').map((t) => (
+                        <tr key={t.uid} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="font-bold text-slate-800">{t.name}</p>
+                              <p className="text-xs text-slate-500">{t.email}</p>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{t.uid}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-medium text-slate-600">{t.mobile}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm font-mono text-slate-600 bg-slate-100 px-2 py-0.5 rounded">{t.password}</span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="text-sm text-slate-500">{format(new Date(t.createdAt), 'dd MMM, HH:mm')}</span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => handleProcessTeacher(t.uid, 'approved')}
+                                disabled={processingTeacherId === t.uid}
+                                className="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                              >
+                                {processingTeacherId === t.uid ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <CheckCircle2 size={14} />}
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleProcessTeacher(t.uid, 'rejected')}
+                                disabled={processingTeacherId === t.uid}
+                                className="px-4 py-2 bg-red-600 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-all disabled:opacity-50 flex items-center gap-2"
+                              >
+                                {processingTeacherId === t.uid ? <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <X size={14} />}
+                                Reject
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
