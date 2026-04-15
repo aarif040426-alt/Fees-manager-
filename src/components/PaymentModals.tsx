@@ -13,7 +13,8 @@ import {
   FileText,
   CheckCircle2,
   Trash2,
-  MessageCircle
+  MessageCircle,
+  Receipt
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { format } from 'date-fns';
@@ -203,10 +204,15 @@ export const ReceiptModal = ({
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-        className="relative w-full max-w-lg bg-[#ffffff] rounded-3xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] overflow-hidden print:shadow-none print:rounded-none"
+        className="relative w-full max-w-lg bg-[#ffffff] rounded-3xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] overflow-hidden flex flex-col max-h-[90vh] print:shadow-none print:rounded-none"
       >
-        <div className="p-6 border-b border-[#f1f5f9] flex items-center justify-between print:hidden">
-          <h2 className="text-xl font-bold text-[#0f172a]">Payment Receipt</h2>
+        <div className="p-6 border-b border-[#f1f5f9] flex items-center justify-between bg-[#ffffff] sticky top-0 z-10 print:hidden">
+          <div className="flex items-center gap-3">
+            <div className="bg-[#2563eb] p-2 rounded-xl text-[#ffffff]">
+              <Receipt size={20} />
+            </div>
+            <h2 className="text-xl font-bold text-[#0f172a]">Payment Receipt</h2>
+          </div>
           <div className="flex items-center gap-2">
             <button 
               onClick={handlePrint} 
@@ -229,7 +235,7 @@ export const ReceiptModal = ({
           </div>
         </div>
 
-        <div className="p-10 space-y-8" id="receipt-content" style={{ backgroundColor: '#ffffff' }}>
+        <div className="p-10 space-y-8 overflow-y-auto flex-1" id="receipt-content" style={{ backgroundColor: '#ffffff' }}>
           <div className="text-center space-y-2">
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#2563eb', color: '#ffffff' }}>
               <CheckCircle2 size={32} />
@@ -275,13 +281,25 @@ export const ReceiptModal = ({
             <h2 className="text-4xl font-black tracking-tight" style={{ color: '#0f172a' }}>₹{payment.amount}</h2>
           </div>
 
-          <div className="text-center space-y-1">
-            <p className="text-sm font-bold" style={{ color: '#0f172a' }}>{teacherName}</p>
-            <p className="text-xs" style={{ color: '#94a3b8' }}>Thank you for your payment!</p>
+          <div className="mt-8 pt-8 border-t flex justify-between items-end" style={{ borderColor: '#e2e8f0' }}>
+            <div className="space-y-0.5">
+              <p className="text-sm font-bold" style={{ color: '#0f172a' }}>{tuitionName || teacherName}</p>
+              <p className="text-[10px] font-medium" style={{ color: '#94a3b8' }}>TutorFlow Tuition Management</p>
+            </div>
+            <div className="text-right space-y-0.5">
+              <p className="text-[10px] font-medium" style={{ color: '#94a3b8' }}>Generated on</p>
+              <p className="text-sm font-bold" style={{ color: '#0f172a' }}>{format(new Date(), 'dd MMM yyyy')}</p>
+            </div>
           </div>
         </div>
 
-        <div className="p-6 bg-[#f8fafc] border-t border-[#f1f5f9] flex items-center justify-center gap-3 print:hidden">
+        <div className="p-6 bg-[#f8fafc] border-t border-[#f1f5f9] flex flex-wrap items-center justify-end gap-3 print:hidden">
+          <button 
+            onClick={onClose}
+            className="px-6 py-3 text-[#475569] font-bold hover:bg-[#f1f5f9] rounded-2xl transition-colors"
+          >
+            Close
+          </button>
           <button 
             onClick={handleWhatsAppShare}
             className="flex items-center gap-2 px-6 py-3 bg-[#059669] text-[#ffffff] font-bold rounded-2xl hover:bg-[#047857] transition-all shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] shadow-[#064e3b]/10"
@@ -456,7 +474,7 @@ export const AnnualReportModal = ({
       >
         <div className="p-6 border-b border-[#f1f5f9] flex items-center justify-between bg-[#ffffff] sticky top-0 z-10 print:hidden">
           <div className="flex items-center gap-3">
-            <div className="bg-[#4f46e5] p-2 rounded-xl text-[#ffffff]">
+            <div className="bg-[#2563eb] p-2 rounded-xl text-[#ffffff]">
               <FileText size={20} />
             </div>
             <h2 className="text-xl font-bold text-[#0f172a]">Annual Payment Report</h2>
@@ -572,13 +590,13 @@ export const AnnualReportModal = ({
             </div>
           </div>
 
-          <div className="pt-8 border-t flex justify-between items-center" style={{ borderColor: '#f1f5f9' }}>
-            <div className="space-y-1">
-              <p className="text-sm font-bold" style={{ color: '#0f172a' }}>{teacherName}</p>
-              <p className="text-xs" style={{ color: '#94a3b8' }}>TutorFlow Tuition Management</p>
+          <div className="mt-12 pt-8 border-t flex justify-between items-end" style={{ borderColor: '#e2e8f0' }}>
+            <div className="space-y-0.5">
+              <p className="text-sm font-bold" style={{ color: '#0f172a' }}>{tuitionName || teacherName}</p>
+              <p className="text-[10px] font-medium" style={{ color: '#94a3b8' }}>TutorFlow Tuition Management</p>
             </div>
-            <div className="text-right">
-              <p className="text-xs" style={{ color: '#94a3b8' }}>Generated on</p>
+            <div className="text-right space-y-0.5">
+              <p className="text-[10px] font-medium" style={{ color: '#94a3b8' }}>Generated on</p>
               <p className="text-sm font-bold" style={{ color: '#0f172a' }}>{format(new Date(), 'dd MMM yyyy')}</p>
             </div>
           </div>
@@ -601,7 +619,7 @@ export const AnnualReportModal = ({
           <button 
             onClick={handleDownloadPDF}
             disabled={isGenerating}
-            className="flex items-center gap-2 px-6 py-3 bg-[#4f46e5] text-[#ffffff] font-bold rounded-2xl hover:bg-[#4338ca] transition-all shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] shadow-[#312e81]/10 disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-3 bg-[#2563eb] text-[#ffffff] font-bold rounded-2xl hover:bg-[#1d4ed8] transition-all shadow-[0_10px_15px_-3px_rgba(0,0,0,0.1),0_4px_6px_-4px_rgba(0,0,0,0.1)] shadow-[#1e3a8a]/10 disabled:opacity-50"
           >
             <Download size={18} />
             <span>{isGenerating ? 'Generating...' : 'Download PDF'}</span>
