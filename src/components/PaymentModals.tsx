@@ -234,20 +234,11 @@ export const ReceiptModal = ({
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#2563eb', color: '#ffffff' }}>
               <CheckCircle2 size={32} />
             </div>
-            <h1 className="text-3xl font-black tracking-normal" style={{ color: '#000000', margin: '0', lineHeight: '1.2' }}>
-              {tuitionName || `${teacherName}'s Tuition`}
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#0f172a' }}>
+              {tuitionName || 'Payment Successful'}
             </h1>
-            <div className="flex items-center justify-center gap-2 mt-2">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-3 py-1 rounded-full">
-                Official Receipt
-              </span>
-              {tuitionName && (
-                <span className="text-xs font-medium text-slate-500">
-                  by {teacherName}
-                </span>
-              )}
-            </div>
-            <p className="text-xs mt-2" style={{ color: '#64748b' }}>Generated on {format(new Date(), 'dd MMM yyyy')}</p>
+            {tuitionName && <p className="text-sm font-bold text-blue-600 uppercase tracking-widest">Payment Receipt</p>}
+            <p style={{ color: '#64748b' }}>Receipt generated on {format(new Date(), 'dd MMM yyyy')}</p>
           </div>
 
           <div className="rounded-2xl p-6 space-y-4 border" style={{ backgroundColor: '#f8fafc', borderColor: '#f1f5f9' }}>
@@ -493,21 +484,12 @@ export const AnnualReportModal = ({
         </div>
 
         <div className="p-10 space-y-8 overflow-y-auto flex-1" id="report-content" style={{ backgroundColor: '#ffffff' }}>
-          <div className="text-center border-b pb-8 mb-8" style={{ borderColor: '#e2e8f0' }}>
-            <h1 className="text-4xl font-black tracking-normal" style={{ color: '#000000', margin: '0', lineHeight: '1.2' }}>
-              {tuitionName || `${teacherName}'s Tuition`}
-            </h1>
-            <div className="flex items-center justify-center gap-3 mt-3">
-              <span className="text-xs font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-4 py-1.5 rounded-full">
-                Annual Payment Report
-              </span>
-              {tuitionName && (
-                <span className="text-sm font-medium text-slate-500">
-                  Managed by {teacherName}
-                </span>
-              )}
+          {tuitionName && (
+            <div className="text-center border-b pb-6 mb-6" style={{ borderColor: '#e2e8f0' }}>
+              <h1 className="text-3xl font-black tracking-tight" style={{ color: '#0f172a' }}>{tuitionName}</h1>
+              <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mt-1">Annual Payment Report</p>
             </div>
-          </div>
+          )}
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b pb-6" style={{ borderColor: '#e2e8f0' }}>
             <div className="space-y-3">
               <div className="flex items-center gap-4">
