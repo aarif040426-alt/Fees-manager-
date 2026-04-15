@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { db, auth } from './firebase';
 import { onAuthStateChanged, setPersistence, browserSessionPersistence } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { Teacher, Theme } from '../types';
 
 interface AuthContextType {
@@ -63,7 +63,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }, 10000);
 
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeTeacher: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Clean up previous teacher listener if it exists
+      if (unsubscribeTeacher) {
+        unsubscribeTeacher();
+        unsubscribeTeacher = null;
+      }
+
       if (firebaseUser) {
         try {
           const teacherUid = firebaseUser.email?.split('@')[0] || firebaseUser.uid;
@@ -73,10 +81,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           
           setIsRealAdmin(isAdminEmail);
 
-          let currentTeacher: Teacher | null = null;
-
           if (isAdminEmail) {
-            currentTeacher = {
+            const basicAdmin: Teacher = {
               uid: teacherUid,
               name: firebaseUser.displayName || (firebaseUser.email?.toLowerCase() === 'admin@tutorflow.com' ? 'Administrator' : 'Admin User'),
               email: firebaseUser.email || '',
@@ -91,15 +97,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               },
               createdAt: new Date().toISOString(),
             };
-            setTeacher(currentTeacher);
-            setUser({ uid: teacherUid, email: currentTeacher.email, displayName: currentTeacher.name });
+            setTeacher(basicAdmin);
+            setUser({ uid: teacherUid, email: basicAdmin.email, displayName: basicAdmin.name });
             applyTheme('dark');
           }
 
-          try {
-            const teacherRef = doc(db, 'teachers', teacherUid);
-            const teacherSnap = await getDoc(teacherRef);
-            
+          // Listen to teacher profile in real-time
+          const teacherRef = doc(db, 'teachers', teacherUid);
+          unsubscribeTeacher = onSnapshot(teacherRef, (teacherSnap) => {
             if (teacherSnap.exists()) {
               const data = teacherSnap.data() as Teacher;
               
@@ -109,6 +114,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 auth.signOut();
                 setUser(null);
                 setTeacher(null);
+                if (unsubscribeTeacher) unsubscribeTeacher();
                 return;
               }
 
@@ -123,13 +129,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.log("Teacher profile not found in Firestore for:", teacherUid);
               setUser({ uid: teacherUid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
             }
-          } catch (error) {
-            console.error("Error fetching teacher profile:", error);
-            // If it's an admin email, we already set the basic admin profile, so we're okay
-            if (!isAdminEmail) {
-              setUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
-            }
-          }
+          }, (error) => {
+            console.error("Error listening to teacher profile:", error);
+          });
+
         } catch (error) {
           console.error("Error initializing teacher profile:", error);
           setUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', displayName: firebaseUser.displayName || '' });
@@ -144,7 +147,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     return () => {
-      unsubscribe();
+      unsubscribeAuth();
+      if (unsubscribeTeacher) unsubscribeTeacher();
       clearTimeout(loadingTimeout);
     };
   }, []);
