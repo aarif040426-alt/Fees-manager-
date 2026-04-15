@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const applyTheme = (theme: Theme) => {
     const root = window.document.documentElement;
-    root.classList.remove('light', 'dark', 'blue', 'purple');
+    root.classList.remove('light', 'dark');
     root.classList.add(theme);
   };
 

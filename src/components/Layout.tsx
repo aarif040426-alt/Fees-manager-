@@ -10,11 +10,14 @@ import {
   Menu, 
   X,
   GraduationCap,
-  Shield
+  Shield,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { logout } from '../lib/firebase';
+import { logout, db } from '../lib/firebase';
 import { useAuth } from '../lib/AuthContext';
+import { doc, updateDoc } from 'firebase/firestore';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
@@ -55,7 +58,21 @@ export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const { teacher, logout, isRealAdmin } = useAuth();
+  const { teacher, logout, isRealAdmin, setTheme } = useAuth();
+
+  const toggleTheme = async () => {
+    const newTheme = teacher?.theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    if (teacher?.uid) {
+      try {
+        await updateDoc(doc(db, 'teachers', teacher.uid), {
+          theme: newTheme
+        });
+      } catch (error) {
+        console.error("Error updating theme:", error);
+      }
+    }
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -155,7 +172,17 @@ export default function Layout() {
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Add any global actions here */}
+            <button
+              onClick={toggleTheme}
+              className="p-2 text-slate-600 hover:bg-slate-50 rounded-xl transition-all border border-slate-100 shadow-sm"
+              title={teacher?.theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {teacher?.theme === 'dark' ? (
+                <Sun size={20} className="text-amber-500" />
+              ) : (
+                <Moon size={20} className="text-slate-600" />
+              )}
+            </button>
           </div>
         </header>
 

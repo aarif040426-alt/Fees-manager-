@@ -90,147 +90,18 @@
   .dark .hover\:bg-slate-100:hover {
     background-color: #334155;
   }
+  /* Badge overrides */
+  .dark .bg-emerald-100 { background-color: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.2); color: #34d399; }
+  .dark .bg-rose-100 { background-color: rgba(244, 63, 94, 0.1); border-color: rgba(244, 63, 94, 0.2); color: #fb7185; }
+  .dark .bg-amber-100 { background-color: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+  .dark .bg-blue-100 { background-color: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+  .dark .bg-slate-200 { background-color: #334155; }
+  
   /* Primary color overrides for Dark */
   .dark .bg-blue-600 { background-color: #3b82f6; }
   .dark .text-blue-600 { color: #60a5fa; }
   .dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.1); }
   .dark .shadow-blue-100 { shadow-color: rgba(59, 130, 246, 0.2); }
-
-  /* Ocean Theme (Blue) */
-  .blue {
-    background-color: #0c4a6e;
-    color: #f0f9ff;
-  }
-  .blue body {
-    background-color: #0c4a6e;
-    color: #f0f9ff;
-  }
-  .blue input, .blue select, .blue textarea {
-    color: #f0f9ff;
-    background-color: #075985;
-  }
-  .blue input::placeholder, .blue select::placeholder, .blue textarea::placeholder {
-    color: #7dd3fc;
-  }
-  .blue .bg-white {
-    background-color: #075985;
-    border-color: #0369a1;
-  }
-  .blue .text-slate-900 {
-    color: #f0f9ff;
-  }
-  .blue .text-slate-800 {
-    color: #e0f2fe;
-  }
-  .blue .text-slate-700 {
-    color: #bae6fd;
-  }
-  .blue .text-slate-600 {
-    color: #7dd3fc;
-  }
-  .blue .text-slate-500 {
-    color: #38bdf8;
-  }
-  .blue .bg-slate-50 {
-    background-color: #0c4a6e;
-  }
-  .blue .bg-slate-100 {
-    background-color: #0369a1;
-  }
-  .blue .border-slate-200 {
-    border-color: #0369a1;
-  }
-  .blue .border-slate-100 {
-    border-color: #0369a1;
-  }
-  .blue .divide-slate-100 {
-    border-color: #0369a1;
-  }
-  .blue .bg-slate-50\/50 {
-    background-color: rgba(3, 105, 161, 0.3);
-  }
-  .blue .hover\:bg-slate-50\/50:hover {
-    background-color: rgba(3, 105, 161, 0.4);
-  }
-  .blue .hover\:bg-slate-50:hover {
-    background-color: #0369a1;
-  }
-  .blue .hover\:bg-slate-100:hover {
-    background-color: #0284c7;
-  }
-  /* Primary color overrides for Ocean */
-  .blue .bg-blue-600 { background-color: #0ea5e9; }
-  .blue .text-blue-600 { color: #7dd3fc; }
-  .blue .bg-blue-50 { background-color: #0369a1; }
-  .blue .shadow-blue-100 { shadow-color: rgba(14, 165, 233, 0.2); }
-
-  /* Royal Theme (Purple) */
-  .purple {
-    background-color: #581c87;
-    color: #faf5ff;
-  }
-  .purple body {
-    background-color: #581c87;
-    color: #faf5ff;
-  }
-  .purple input, .purple select, .purple textarea {
-    color: #faf5ff;
-    background-color: #6b21a8;
-  }
-  .purple input::placeholder, .purple select::placeholder, .purple textarea::placeholder {
-    color: #d8b4fe;
-  }
-  .purple .bg-white {
-    background-color: #6b21a8;
-    border-color: #7e22ce;
-  }
-  .purple .text-slate-900 {
-    color: #faf5ff;
-  }
-  .purple .text-slate-800 {
-    color: #f5f3ff;
-  }
-  .purple .text-slate-700 {
-    color: #e9d5ff;
-  }
-  .purple .text-slate-600 {
-    color: #d8b4fe;
-  }
-  .purple .text-slate-500 {
-    color: #c084fc;
-  }
-  .purple .bg-slate-50 {
-    background-color: #581c87;
-  }
-  .purple .bg-slate-100 {
-    background-color: #7e22ce;
-  }
-  .purple .border-slate-200 {
-    border-color: #7e22ce;
-  }
-  .purple .border-slate-100 {
-    border-color: #7e22ce;
-  }
-  .purple .divide-slate-100 {
-    border-color: #7e22ce;
-  }
-  .purple .bg-slate-50\/50 {
-    background-color: rgba(126, 34, 206, 0.3);
-  }
-  .purple .hover\:bg-slate-50\/50:hover {
-    background-color: rgba(126, 34, 206, 0.4);
-  }
-  .purple .hover\:bg-slate-50:hover {
-    background-color: #7e22ce;
-  }
-  .purple .hover\:bg-slate-100:hover {
-    background-color: #9333ea;
-  }
-  /* Primary color overrides for Royal */
-  .purple .bg-blue-600 { background-color: #a855f7; }
-  .purple .text-blue-600 { color: #e9d5ff; }
-  .purple .bg-blue-50 { background-color: #7e22ce; }
-  .purple .shadow-blue-100 { shadow-color: rgba(168, 85, 247, 0.2); }
 }
 
 /* Custom scrollbar for a cleaner look */

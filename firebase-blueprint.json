@@ -12,7 +12,7 @@
         "role": { "type": "string", "enum": ["admin", "teacher"] },
         "plan": { "type": "string", "enum": ["Free", "Pro", "Enterprise"] },
         "planStartDate": { "type": "string", "format": "date-time" },
-        "theme": { "type": "string", "enum": ["light", "dark", "blue", "purple"] },
+        "theme": { "type": "string", "enum": ["light", "dark"] },
         "photoUrl": { "type": "string" },
         "tuitionName": { "type": "string", "description": "Name of the tuition or institute" },
         "notifications": {

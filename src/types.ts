@@ -2,7 +2,7 @@ export type Board = 'SSC' | 'ICSE' | 'CBSE' | 'Other';
 export type PaymentStatus = 'Paid' | 'Pending' | 'Partial';
 export type PaymentMethod = 'Cash' | 'Online';
 export type SubscriptionPlan = 'Free' | 'Pro' | 'Enterprise';
-export type Theme = 'light' | 'dark' | 'blue' | 'purple';
+export type Theme = 'light' | 'dark';
 
 export interface Teacher {
   uid: string;

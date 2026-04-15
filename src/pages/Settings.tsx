@@ -447,27 +447,28 @@ export default function Settings() {
                         <Palette size={18} className="text-blue-600" />
                         Theme Preference
                       </label>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="grid grid-cols-2 gap-4">
                         {[
-                          { id: 'light', label: 'Light', icon: Sun, color: 'bg-white border-slate-200 text-slate-900' },
-                          { id: 'dark', label: 'Dark', icon: Moon, color: 'bg-slate-900 border-slate-800 text-white' },
-                          { id: 'blue', label: 'Ocean', icon: Globe, color: 'bg-blue-600 border-blue-500 text-white' },
-                          { id: 'purple', label: 'Royal', icon: Zap, color: 'bg-purple-600 border-purple-500 text-white' },
+                          { id: 'light', label: 'Light Mode', icon: Sun, color: 'bg-white border-slate-200 text-slate-900', desc: 'Clean and bright interface' },
+                          { id: 'dark', label: 'Dark Mode', icon: Moon, color: 'bg-slate-900 border-slate-800 text-white', desc: 'Easy on the eyes at night' },
                         ].map((t) => (
                           <button
                             key={t.id}
                             type="button"
                             onClick={() => handleThemeChange(t.id as Theme)}
-                            className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all ${
+                            className={`flex items-center gap-4 p-6 rounded-3xl border-2 transition-all text-left ${
                               formData.theme === t.id 
-                                ? "border-blue-500 ring-2 ring-blue-100 scale-105" 
-                                : "border-slate-100 hover:border-slate-200"
+                                ? "border-blue-500 bg-blue-50/50 ring-2 ring-blue-100" 
+                                : "border-slate-100 hover:border-slate-200 bg-slate-50/30"
                             }`}
                           >
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center shadow-sm ${t.color}`}>
-                              <t.icon size={20} />
+                            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shadow-sm shrink-0 ${t.color}`}>
+                              <t.icon size={24} />
                             </div>
-                            <span className="text-xs font-bold text-slate-700">{t.label}</span>
+                            <div>
+                              <p className="font-bold text-slate-900">{t.label}</p>
+                              <p className="text-xs text-slate-500">{t.desc}</p>
+                            </div>
                           </button>
                         ))}
                       </div>
