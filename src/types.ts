@@ -16,6 +16,7 @@ export interface Teacher {
   planStartDate: string;
   theme: Theme;
   photoUrl?: string;
+  tuitionName?: string;
   status?: 'pending' | 'approved' | 'rejected';
   notifications: {
     email: boolean;

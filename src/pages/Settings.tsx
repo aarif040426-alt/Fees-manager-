@@ -53,6 +53,7 @@ export default function Settings() {
     name: '',
     email: '',
     mobile: '',
+    tuitionName: '',
     theme: 'light' as Theme,
     notifications: {
       email: true,
@@ -81,6 +82,7 @@ export default function Settings() {
         name: teacher.name || '',
         email: teacher.email || '',
         mobile: teacher.mobile || '',
+        tuitionName: teacher.tuitionName || '',
         theme: teacher.theme || 'light',
         notifications: teacher.notifications || {
           email: true,
@@ -391,6 +393,21 @@ export default function Settings() {
                             value={formData.name}
                             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                             className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-slate-700 ml-1">Tuition / Institute Name</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                            <Globe size={18} className="text-slate-400" />
+                          </div>
+                          <input
+                            type="text"
+                            value={formData.tuitionName}
+                            onChange={(e) => setFormData({ ...formData, tuitionName: e.target.value })}
+                            className="block w-full pl-11 pr-4 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
+                            placeholder="e.g. Farheen Tuition"
                           />
                         </div>
                       </div>

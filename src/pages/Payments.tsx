@@ -435,6 +435,7 @@ export default function Payments() {
             payment={receiptModal.payment}
             student={receiptModal.student}
             teacherName={teacher?.name || user?.displayName || 'Teacher'}
+            tuitionName={teacher?.tuitionName}
           />
         )}
         {reportModal.isOpen && (
@@ -443,6 +444,7 @@ export default function Payments() {
             onClose={() => setReportModal({ student: null as any, isOpen: false })}
             student={reportModal.student}
             teacherName={teacher?.name || user?.displayName || 'Teacher'}
+            tuitionName={teacher?.tuitionName}
           />
         )}
         {deleteModal.isOpen && (

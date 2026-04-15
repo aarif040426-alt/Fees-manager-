@@ -106,6 +106,7 @@ service cloud.firestore {
              (data.get('plan', null) == null || data.plan in ['Free', 'Pro', 'Enterprise']) &&
              (data.get('theme', null) == null || data.theme in ['light', 'dark', 'blue', 'purple']) &&
              (data.get('photoUrl', null) == null || data.photoUrl is string) &&
+             (data.get('tuitionName', null) == null || data.tuitionName is string) &&
              (data.get('planStartDate', null) == null || data.planStartDate is string) &&
              (data.get('notifications', null) == null || (
                data.notifications is map &&

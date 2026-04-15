@@ -107,13 +107,15 @@ export const ReceiptModal = ({
   onClose, 
   payment, 
   student,
-  teacherName 
+  teacherName,
+  tuitionName
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
   payment: Payment;
   student: Student;
   teacherName: string;
+  tuitionName?: string;
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   if (!isOpen || !payment || !student) return null;
@@ -232,7 +234,10 @@ export const ReceiptModal = ({
             <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#2563eb', color: '#ffffff' }}>
               <CheckCircle2 size={32} />
             </div>
-            <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#0f172a' }}>Payment Successful</h1>
+            <h1 className="text-2xl font-bold tracking-tight" style={{ color: '#0f172a' }}>
+              {tuitionName || 'Payment Successful'}
+            </h1>
+            {tuitionName && <p className="text-sm font-bold text-blue-600 uppercase tracking-widest">Payment Receipt</p>}
             <p style={{ color: '#64748b' }}>Receipt generated on {format(new Date(), 'dd MMM yyyy')}</p>
           </div>
 
@@ -302,12 +307,14 @@ export const AnnualReportModal = ({
   isOpen, 
   onClose, 
   student,
-  teacherName 
+  teacherName,
+  tuitionName
 }: { 
   isOpen: boolean; 
   onClose: () => void; 
   student: Student;
   teacherName: string;
+  tuitionName?: string;
 }) => {
   const [studentPayments, setStudentPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -477,6 +484,12 @@ export const AnnualReportModal = ({
         </div>
 
         <div className="p-10 space-y-8 overflow-y-auto flex-1" id="report-content" style={{ backgroundColor: '#ffffff' }}>
+          {tuitionName && (
+            <div className="text-center border-b pb-6 mb-6" style={{ borderColor: '#e2e8f0' }}>
+              <h1 className="text-3xl font-black tracking-tight" style={{ color: '#0f172a' }}>{tuitionName}</h1>
+              <p className="text-sm font-bold text-blue-600 uppercase tracking-widest mt-1">Annual Payment Report</p>
+            </div>
+          )}
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b pb-6" style={{ borderColor: '#e2e8f0' }}>
             <div className="space-y-3">
               <div className="flex items-center gap-4">

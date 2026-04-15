@@ -14,6 +14,7 @@
         "planStartDate": { "type": "string", "format": "date-time" },
         "theme": { "type": "string", "enum": ["light", "dark", "blue", "purple"] },
         "photoUrl": { "type": "string" },
+        "tuitionName": { "type": "string", "description": "Name of the tuition or institute" },
         "notifications": {
           "type": "object",
           "properties": {
